@@ -6,8 +6,8 @@
 
 #### Multicast
 
-- Node with a piece of information to be communicated to everyone
-- Distributed group of Nodes = Processes at internet-based host
+- ***Node with a piece of information to be communicated to everyone***
+- Distributed group of Nodes = Processes at Internet-based host
 - Problem: you want to get information out to other members in your group
 - There might be multiple multicast message going around at the same time, each of them from potentially, a different sender.
 
@@ -198,16 +198,16 @@ From old mathematical branch of Epidemiology
 - Do you believe him/her?
 - What would be your first responsibility?
 
-If you didn't believe your manager, what would be your first resplnsibility? well, your first responsibility would be to build a mechanism that detects failures of servers in your datacenter
+If you didn't believe your manager, what would be your first responsibility? well, your first responsibility would be to build a mechanism that detects failures of servers in your datacenter
 
 - Build a failure detector
 - What are some things that could go wrong if you didn't do this
 
 #### Failure Are The Norm
 
-- Say, the rate of failure of one machine (OS/disk?motherboard/network, etc) is once every 10 years (120 months) on average.
+- Say, the rate of failure of one machine (OS/disk/motherboard/network, etc) is once every 10 years (120 months) on average.
 - When you have 120 servers in the DC, the mean time to failure(MTTF) of the next machine is 1 month
-- When you have 12,000 servers in the DC, the MTTF is about once ***every 7.2 hours!***To Build a Dailure Detector
+- When you have 12,000 servers in the DC, the MTTF is about once ***every 7.2 hours!***To Build a Failure Detector
 - You have a few options:
   1. Hire 1000 people, each to monitor one machine in the datacenter and report to you when it fails.
   2. Write a failure detector program(distributed) that automatically detects failures and reports to your workstation
@@ -224,9 +224,29 @@ Which is more preferable and why?
 
 #### Group Membership Service
 
-Membership List(<->Application Queries - communicate with different layere.g., gossip, overlays, DHT's, etc.) < - > Membership Protocol ( <-> Unreliable Communication - communicate with different layer)
+Membership List(Application Queries e.g., gossip, overlays, DHT's, etc.) which maintains the list of most or all of the other processes that are currently in your system and that have not yet failed(non-faulty processes)
+
+This membership list is accessed by a variety of applications for instance application might be a gossip-based application.
+
+***Accessing the membership list or even sampling the membership list is an important building block of many distributed algorithms*** -> membership protocols
+
+So our goal is build the membership protocol which keeps this membership list up-to-date
+
+> membership list : 아직 오류로 중단 안 된 것들의 리스트
 
 #### Two Sub-Protocols
+
+One is a mechanism that detects failures, the second is a mechanism that ***disseminates information about these failures after detection to the other processes in the system***
+
+> Failure detection : 실패를 찾음
+>
+> Disseminate : 실패를 알림
+
+Multiple processes might find out about this failure, ***but we need to ensure that at least one non-faulty process finds out about this failure.*** What it does, it can then use the dissemination. ***component to disseminate this information to the other processes quickly.***
+
+So that they get to know about this failure and update their membership lists
+
+> Failure detection 이후에 적어도 failure 상태가 아닌 하나의 프로세스는 이 실패에 대해서 알아야 함. 알리는 일을 하는게 disseminate임
 
 1. Dissemination - Dissemination component can also be used to disseminate information about process joints as well as process leaves in the system
 2. Failure detector
@@ -241,7 +261,7 @@ Membership List(<->Application Queries - communicate with different layere.g., g
 #### Group Membership Protocol
 
 - Multiple processes might find out about this failure, but we need to ensure that at least one non-faulty process finds out about this failure.
-- What it does, it can then use the dissemination component to disseminate this information to ther other processes quickly
+- What it does, it can then use the dissemination component to disseminate this information to the other processes quickly
 
 ### 2.2  Failure Detectors
 
@@ -265,7 +285,7 @@ The bad news is that achieving both of these properties, completeness and accura
 
 ***You cannot build a failure detector that is 100 percent complete, meaning, it detects all failures.***
 
-Essentially, this boild down to the fact that the failure detector problem is equivalent to another well-known problem in distributed computing known as consensus.
+Essentially, this build down to the fact that the failure detector problem is equivalent to another well-known problem in distributed computing known as consensus.
 
 In real life, failure detectors always guarantee completeness 100 percent of the time. close to the 100%, but never getting exactly at 100 percent.
 
@@ -309,3 +329,254 @@ In each particular picture
 - Problem : if you have one process pj that is slow and is receiving packets at longer delay than others, it might end up marking all the other or almost all the other processes as having failed, with higher probability.
 
 ### 2.3 Gossip-Style Membership
+
+#### Gossip-Style Heartbeating
+
+***The basic concept is that every process wants to send out its heartbeats to all the other processes in the system.*** The heartbeats are again incremented sequence numbers that are incremented locally. Processes timeout waiting for heartbeats and mark the corresponding sources as having failure.
+
+#### Gossip-Style Failure Detection
+
+Protocol:
+
+- Nodes periodically gossip their membership list
+- On receipt, the local membership list is updated
+
+Periodically, each process sends over this entire table to a few of ***its neighbors selected at random.***
+
+- If the heartbeat has not increased fro more than $T_{fail}$ seconds, the member is considered failed
+
+- And after $T_{cleanup}$ seconds, it will delete the member from ths list 
+
+- Why two different timeouts?
+
+  - If you delete the member right away where an entry might never go away.
+
+  > 만약 clean up time 따로 지정 안하고 바로 제거 하면 노드에서 프로세스 종료 하더라도 다른 노드에서 다시 전파돼서 작업이 종료가 안됨
+
+#### Analysis/Discussion
+
+- What happens if gossip period $T_{gossip}$ is decreased?
+
+- A single heartbeat takes O(log(N)) time to propagate.
+
+  So: N heartbeats take :
+
+  - O(long(N)) time to propagate, if bandwidth allwoed per node is allowed to be O(N)
+  - O(Nlog(N)) time to propagate, if bandwidth allowed per node is only O(1)
+  - What about O(k) bandwidth? (N/k * log(N) ?)
+
+- What happens to $P_{mistake}$(false positive rate) as $T_{fail}$, $T_{cleanup}$ is increased?
+
+- Trade-off: False positive rate vs. detection time vs. bandwidth
+
+### 2.4 Which is the best failure detector?
+
+#### Failure Detector Properties...
+
+What does optimal mean?
+
+- Completeness - guarantee always
+- Accuracy - Probability PM(T) (PM(T) : basically probability of mistake in time T)
+- Speed - T time units
+  - Time to first detection of a failure
+- Scale
+  - Equal Load on each member
+  - Network Message Load - N * L compare this across protocols
+
+> N : The number of Nodes
+>
+> T : Time unit
+>
+> L(load) : N/T
+
+- Load per process is linear in N
+- Every tg units = gossip period, send  O(N) gossip message
+- T = log(N) * tg
+- L = N/(tg) = Nlog(N)/T
+- Essentially, the load on each member per gossip period is O(N) because it sends out N entries from its membership lost, so the load is N/(tg)
+- You will notice here automatically that the gossip-based heartbeating protocol here has a higher load that the all-to-all heartbeating we discussed in the previous slide
+- That is natural because ***gossip is trying to get a slightly better accuracy by using more message***
+
+#### What is the Best/Optimal we can do?
+
+- Worst case load L*(per member) as a function of T, PM(T), N independent Message Loss probability $P_{ml}$
+
+> $P_{ml}$ : Probability of losing a message
+
+$$
+L^* = \frac{log(PM(T))}{log(P_{ml})} \frac{1}{T}
+$$
+
+- ***Optimal L is independent of N***
+- All-to-all and gossip-based: sub-optimal
+  - L = O(N/T)
+  - Try to achieve simultaneous detection at all processes
+  - Fail to distinguish Failure Detection and Dissemination components
+
+> Key:
+>
+> - Separate the two components
+> - Use a non heartbeat-based failure Detection Component
+
+### 2.5 Another Probability Failure Detector
+
+#### Swim Failure Detector Protocol
+
+SWIM(Scalable Weekly consistent Infection style Membership protocol)
+
+>프로세서 A가 B에게 req 보내지만 응답이 없으면 무작위의 프로세서에게 req보내고 req에 응답한 프로세서가 B에게 req 보낸뒤 응답을 A에게 보냄(Second Chance)
+
+#### SWIM VS. Heartbeating
+
+For heart beating,
+
+- When you have a very low process load, another words, when you have a low bound on the bandwidth that can be used, the detection time can be very high.
+- If it is constant a load, that is your constraint, the detection time could be as high as order N, Ot hoe other hand, when process load is constant, then heartbeating is O(N)
+
+SWIM
+
+- Get both a constant detection time on expectation as well as a constant process load.
+
+#### SWIM Failure Detector
+
+First Detection Time
+
+- Expected $\frac{e}{e-1}$
+- Constant(independent of group size)
+
+Process Load
+
+- Constant per period - Because each process is sending out, one ping maybe another K indirect ping message and our expectation is receiving, direct ping and our expectation a few indirect ping message
+- <8L*for 15% loss : less than 8 times the optimal load, when you have 15% packet loss.
+
+False Positive Rate
+
+- Tunable(via increasing K - K : The number of random processes)
+- Falls exponentially as load is scaled
+
+Completeness
+
+When a process fails, It will eventually be selected for pinging as long as there are any further processes with this failed process in their membership list, this is the nice property about picking, ping, target at random.
+
+- Deterministic time-bounded
+- Within O(log(N)) periods w.h.p(With high probability) - Because you have expected $e/(e-1)$ protocol periods until detection, you can show that within log in protocol periods or order log in protocol periods with high probability at least one process will ping the failed process and will mark it as having failed
+
+#### Detection Time
+
+- Prob of being pinged in $T' = 1 - (1 - \frac{1}{N})^{N-1} = 1 - e^{-1}$ 
+- E[t] = $T' \frac{e}{e-1}$
+- Completeness : Any alive member detects failure
+  - Eventually
+  - By using a tricks: within worst case O(N) protocol periods
+
+#### Time-Bounded Completeness
+
+> Whenever you pick a membership element pick the next membership element in your list in the liner fashions so essentially you traverse the membership list that you have on per around
+
+You can also reduce this eventual completeness to a time order completeness which is order N rounds in the worst case by using a simple trick
+
+- Key : Select each membership element once as a ping target in a traversal
+  - Round robin pinging
+  - Random permutation of list after each traversal
+- Each failure is detected in worst case 2N-1(local) protocol periods
+- Preserves FD(Failure Detection) properties
+
+### 2.6 Dissemination and suspicion
+
+#### Dissemination
+
+한 프로세스가 중단 됐을떄 다른 프로세스가 그걸 빠르게 알아차리고 정보(작업)를 넘겨줌
+
+#### Dissemination options
+
+- Multicast(hardware/ IP)
+  - unreliable
+  - multiple simultaneous multicast
+- Point-to-point(TCP/UDP)
+  - expensive
+- Zero extra message(SWIM style failure detection) : ***Piggyback on Failure Detector messages***
+  - Infection-style Dissemination
+
+Piggyback: Whenever processes receive these message, they do the same as they did before but in addition they also look at what is being piggybacked and use that to update their membership lists.
+
+#### Infection-Style Dissemination
+
+- Epidemic style dissemination
+- Maintain a buffer of recently joined/evicted processes
+  - piggyback from this buffer
+  - Prefer recent updates
+- Buffer elements are garbage collected after a while
+
+#### Suspicion Mechanism
+
+- False detection, due to:
+  - Perturbed(교란된) processes
+  - packet losses, e.g., from congestion
+- Indirect pinging may not solve the problem
+  - e.g., corrected message losses near pinged host
+- Key: suspect a process before declaring it as failed in the group
+
+In other words, you use a state machine where pi maintains a state machine for a given other process, pj which is present in its membership list. In addition, you start disseminating via the SWIM piggyback message the fact that you are suspecting process pj.
+
+When you are in the suspected state for process pj, you might receive an ack for process pj or maybe even another direct ping from process pj, or even a message from someone else in the group saying "Hey ,process pj has not failed, but in fact it is alive" In that case you move the state back again to alive for process pj
+
+- Distinguish multiple suspicions of a process - Typically pi does this when it receives a suspect pi message, meaning that someone else in the group is suspecting process pi as having failed.
+  - Per-process incarnation number
+  - Inc # for pi can be incremented only by pi
+    - e.g., when it receives a (suspect, pi) message
+  - Somewhat similar to DSDV
+- Higher inc # notifications over-ride lower inc#'s
+- Within an inc#: (Suspect inc #) > (Alive, inc #)
+- (Failed, inc #) overrides everything else
+
+#### Wrap up
+
+- Failures the norm, not the exception in datacenters
+- Every distributed system uses a failure detector
+- many distributed systems use a membership service
+- Ring failure detection underlies
+  - IBM SP2 and many other similar cluster/machines
+- Gossip-style failure detection underlies
+
+## Lesson 3: Grids
+
+### 3.1 Grid Application
+
+#### Example: Rapid Atmospheric Modeling System(RAMS), Colorado State Univ
+
+- Can one run such a program without access to a supercomputer?
+
+### 3.2 Grid Infrastructure
+
+#### Scheduling Problem
+
+How to schedule such an application which consists of essentially a DAG of jobs? - Each job is highly parallelizalbe into tasks over here so each of these nodes can be split up into multiple parallel tasks.
+
+#### 2-Level Scheduling Infrastructure
+
+Essentially what happens in that Globus decides which job gets scheduled at which site and the intra-site protocol at that site decides how to schedule the different tasks of that job at the different machines in that particular site
+
+#### Intra-site Protocol
+
+- Internal allocation & Scheduling monitoring distributing and publishing of Files
+
+Intra-site protocol runs inside each site is responsible for internal allocation and scheduling so it if is given job 0 and job 3 to run, it then decides which of the tasks of job 3 run on which machines. again job 0 is same as well.
+
+It is responsible for monitoring. So if any of these machines which are running a task fail or crash the ***HT Condor protocol is then responsible for restarting tasks on another machine.***
+
+#### Condor(Now HTCondor) - Example of Intra-site protocol
+
+Globus : inter-site protocol
+
+- High-throughput computing system from Univ wisconsin Madison
+- Belongs to a class of Cycle-scavenging systems such systems
+  - Run on a lot of workstations
+  - When workstation is free, ***ask site's central server(or Globus) for tasks***
+  - If user hits a keystrokes or mouse click, stop task
+    - Either kill tasks or ask server to reschedule task
+  - Can also run on dedicated machines
+
+> 놀고 있을때 중앙 site에 작업 요청함. 만약에 유저가 워크스테이션에서 작업 시작하면 하던 일을 중단 하고 작업 rescheduling을 요청 함.
+
+#### Inter-site Protocol
+
