@@ -15,7 +15,7 @@
 
 > Two of the most important requirements as far as cloud computing is concerned are ***fault tolerance and scalability.***
 
-Muilticast sender uses multicast protocol
+Multicast sender uses multicast protocol
 
 - node may crash - Because processes are failure prone
 - Packet may be dropped(or might also be delayed by the underlying network)
@@ -27,7 +27,7 @@ When UDP/TCP packets are sended
 
 - Simplest implementation - One of the simplest ways of doing multicast is a ***centralized approach***
 - Problems?
-  - ***Fault tolerance.*** if the sender faild when it is halfway through its "4" loop, essentially, only half the receivers would have received the multicast.
+  - ***Fault tolerance.*** if the sender failed when it is halfway through its "4" loop, essentially, only half the receivers would have received the multicast.
   - Also ***increases the latency***. The average time for a receiver to receive a multicast could be as high as O(N) which is linear in the size of the group itself
 
 #### Tree-Based
@@ -35,17 +35,16 @@ When UDP/TCP packets are sended
 > Spanning tree : 한 노드에서 다른 노드에 이르는 경로가 오직 하나 뿐인 토폴로지
 >
 > - 스위치나 브리지에서 발생하는 루핑을 막아주기 위한 프로토콜
-> - 스위치나 브리지 구성에섯 출발지부터 목적지까지의 경로가 두 개 이상 존재할 때 한 개의 경로만 남겨두고 나머지는 모두 끊어 두었다가 사용하던 경오레 문제가 발생하면 그 때 끊어 두었던 경로를 하나씩 살린다.
+> - 스위치나 브리지 구성에섯 출발지부터 목적지까지의 경로가 두 개 이상 존재할 때 한 개의 경로만 남겨두고 나머지는 모두 끊어 두었다가 사용하던 경로에 문제가 발생하면 그 때 끊어 두었던 경로를 하나씩 살린다.
 
 When UDP/TCP packets are send
 
-> If you build a tree, a balanced tree with N nodes in your group, the height of the tree is O(log(N)) and ***this means that the latency for a message to reach ant to the nodes in the group is O(long(N))***
+> If you build a tree, a balanced tree with N nodes in your group, the height of the tree is O(log(N)) and ***this means that the latency for a message to reach to the nodes in the group is O(log(N))***
 
 - e.g., IP multicast, SRM, RMTP, TRAM, TMTP
 - Tree setup and maintenance
   - when load failures happen, nodes in the system might actually not receive multicast for a while
     (트리 중간에 있는 노드에서 실패 발생하면 밑에 있는 노드들은 정보 못받음)
-  - 
 - Problems?
 
 #### Tree-Based Multicast Protocols
@@ -131,11 +130,11 @@ From old mathematical branch of Epidemiology
 
 #### Epidemic Multicast (log is based on 2)
 
-- Protocol rounds(local clock) b random targets per round
+- Protocol rounds(local clock) b random targets per round(전체 노드의 수 중에 연결 된 노드(b)의 비율)
   $$
   \beta = \frac{b}{n}
   $$
-  Substituting, at time t = c*lo g(n), the number of infected is
+  Substituting, at time t = c*log(n), the number of infected is
   $$
   y \approx (n + 1)- \frac{1}{n^{cb-2}}
   $$
@@ -143,7 +142,7 @@ From old mathematical branch of Epidemiology
 - Set c, b to be small numbers independent of n
 - Within c\*log(n) rounds, ***[low latency]***
   - All but $\frac{1}{n^{cb-2}}$ number of nodes receive the multicast ***[reliability]***
-  - Each node has transmitted no more than c\*b\*blog(n) gossip message ***[lightweight]***
+  - Each node has transmitted no more than c\*blog(n) gossip message ***[lightweight]***
 
 #### Fault-Tolerance
 
@@ -156,8 +155,8 @@ From old mathematical branch of Epidemiology
 #### Pull gossip protocol
 
 - In all forms of gossip, it takes O(log(N)) rounds before N/2 gets the gossip
-  - Why? Because that's the fatest you can spread a message - a spanning tree with fanout(degree) of constant degree has O(long(N)) total nodes
-- Thereafter, pull gossip is faster than pysh gossip
+  - Why? Because that's the fastest you can spread a message - a spanning tree with fanout(degree) of constant degree has O(long(N)) total nodes
+- Thereafter, pull gossip is faster than push gossip
 - ***Second half of pull gossip finished in time O(log(log(N)))***
 
 #### Topology-Aware gossip
@@ -345,7 +344,7 @@ Periodically, each process sends over this entire table to a few of ***its neigh
 
 - If the heartbeat has not increased fro more than $T_{fail}$ seconds, the member is considered failed
 
-- And after $T_{cleanup}$ seconds, it will delete the member from ths list 
+- And after $T_{cleanup}$ seconds, it will delete the member from the list 
 
 - Why two different timeouts?
 
@@ -431,7 +430,7 @@ SWIM(Scalable Weekly consistent Infection style Membership protocol)
 For heart beating,
 
 - When you have a very low process load, another words, when you have a low bound on the bandwidth that can be used, the detection time can be very high.
-- If it is constant a load, that is your constraint, the detection time could be as high as order N, Ot hoe other hand, when process load is constant, then heartbeating is O(N)
+- If it is constant a load, that is your constraint, the detection time could be as high as order N, On the other hand, when process load is constant, then heartbeating is O(N)
 
 SWIM
 
@@ -485,7 +484,7 @@ You can also reduce this eventual completeness to a time order completeness whic
 
 #### Dissemination
 
-한 프로세스가 중단 됐을떄 다른 프로세스가 그걸 빠르게 알아차리고 정보(작업)를 넘겨줌
+failure 발견하면 다른 노드들에게 알림
 
 #### Dissemination options
 
@@ -497,7 +496,7 @@ You can also reduce this eventual completeness to a time order completeness whic
 - Zero extra message(SWIM style failure detection) : ***Piggyback on Failure Detector messages***
   - Infection-style Dissemination
 
-Piggyback: Whenever processes receive these message, they do the same as they did before but in addition they also look at what is being piggybacked and use that to update their membership lists.
+Piggyback: Whenever processes receive these message, they do the same as they did before but in addition they also look at what is being piggybacked and use that to update their membership lists.(ack와 데이터를 같이 송신)
 
 #### Infection-Style Dissemination
 
@@ -552,7 +551,7 @@ When you are in the suspected state for process pj, you might receive an ack for
 
 How to schedule such an application which consists of essentially a DAG of jobs? - Each job is highly parallelizalbe into tasks over here so each of these nodes can be split up into multiple parallel tasks.
 
-#### 2-Level Scheduling Infrastructure
+#### 2-Level Scheduling Infrastructure(Inter-site <-> intra-site)
 
 Essentially what happens in that Globus decides which job gets scheduled at which site and the intra-site protocol at that site decides how to schedule the different tasks of that job at the different machines in that particular site
 
@@ -568,7 +567,7 @@ It is responsible for monitoring. So if any of these machines which are running 
 
 Globus : inter-site protocol
 
-- High-throughput computing system from Univ wisconsin Madison
+- High-throughput computing system from Univ Wisconsin Madison
 - Belongs to a class of Cycle-scavenging systems such systems
   - Run on a lot of workstations
   - When workstation is free, ***ask site's central server(or Globus) for tasks***
@@ -579,4 +578,57 @@ Globus : inter-site protocol
 > 놀고 있을때 중앙 site에 작업 요청함. 만약에 유저가 워크스테이션에서 작업 시작하면 하던 일을 중단 하고 작업 rescheduling을 요청 함.
 
 #### Inter-site Protocol
+
+The internal structure of the sites is typically invisible to Globus. So this is known as transparency and transparency essentially means invisibility. So Globus does not necessarily need to know about what Condor does inside the Wisconsin site or what MIT's intra-site protocol does inside the MIT site.
+
+> inter-site protocol은 intra-site protocol에서 하는 걸 알 필요 없음
+
+So ***Globus protocol is responsible for external allocation.*** It is responsible for the scheduling to the extent that it talks with the schedulers at the individual sites, but Globus doesn't necessarily do much of scheduling it self.
+
+#### Globus
+
+- Globus Alliance involves universities, national US research labs, and some companies
+- Standardized several things, especially software tools
+- Separately, but related: Open Grid Forum
+- Globus Alliance has developed the Globus Toolkit which is one of the standard way to run the inter-site protocol
+
+#### Globus toolkit
+
+- Open source
+- Consist of several components
+  - GridFTP : Wide area transfer of bulk data
+  - GRAM5(Grid Resource Allocation Manager): submit, locate, cancel, and manage jobs
+    - Not a scheduler***(It is a job allocator and manager but it is not a scheduler)***
+    - Globus communicates with the schedulers in intra-site protocol like HTCondor or Portable Batch System(PBS)
+  - RLS(Replica Location Service): Naming service that translates from a file/dir name to a target location(or another file/dir name)
+  - Libriaries like XIO to provide a standard API for all Grid IO functionalities
+  - Grid Security Infrastructure
+
+#### Security Issues
+
+Security is important in grids. because grids are essentially federated. ***There is no central authority that manages and owns the entire grid***
+
+> federate : 연합하다.
+
+- Important in Grids because they are federated, i.e., not single entity controls the entire infrastructure
+
+- Single sign-on: collective job set should require once-only user authentication
+- Mapping to local security mechanisms: some sites use Kerberos, other using Unix
+- Delegation: credentials to accesses resource inherited by subcomputations, e.g., job 0 to job 1
+- Community authorization: e.g., third-party authentication
+- These are also important in clouds, but less so because clouds are typically run under a central control
+- In clouds the focus is on failures, scale, on-demand nature
+
+#### Summary
+
+There is an open question out there which is whether grids and in general high performance computing are in fact, converging towards clouds computing and toward data intensive computing and this is an open question
+
+There is a lot of commonalities among these two different areas but they tend to be disjoint areas in terms of what the software and the standards that they develop as well as the conferences where research get published
+
+So one of the things that i would encourage you to do is compare the architecture of Globus with the architecture of Openstack. OpenStack is one of these cloud computing open source platforms that has emerged so that you can draw your virtualized cloud computing platform
+
+- Grid computing focuses on computation-intensive computing(HPC)
+- Though often federated, architecture and key concept have a lot in common with that of clouds
+- Are Grids/HPC converging towards clouds?
+  - e.g., Compare OpenStack and Globus
 
