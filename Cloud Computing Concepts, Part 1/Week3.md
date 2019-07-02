@@ -277,7 +277,7 @@ Why is ping and pong needed? P2P systems have a very high rate of churn(마구 �
 >
 > Query : 파일 있는지 물어볼려구 사용 됨
 >
-> Ping : 현재 제대로 시스템 상에 존재하는지 확인하기 위해 사용 됨
+> Ping : 현재 제대로 시스템 상에 peer 존재하는지 확인하기 위해 사용 됨
 >
 > -> 헷갈리지 말자~
 
@@ -299,18 +299,18 @@ Why is ping and pong needed? P2P systems have a very high rate of churn(마구 �
   - Solutions : Multiplex, cache and reduce frequency of pings/pongs
   - Multiplex : when receive a multiple ping, then send one pong instead of sending multiple pong messages. similar in ping too
 
-- Repeated searchs with same keywords
+- Repeated search with same keywords
 
-  - Solution: cache Query, QueryHit m,essages
+  - Solution: cache Query, QueryHit messages
 
-- Modem-connected hosts do no have enough bandwith for passing Gnutella traffic
+- Modem-connected hosts do no have enough bandwidth for passing Gnutella traffic
 
   - Solution : use a central server to act as proxy for such peers
-  - Another soultion: FastTrack System
+  - Another solution: FastTrack System
 
 - Large number of freeloaders
 
-  - 70% of users in 2000 were freeloadres
+  - 70% of users in 2000 were freeloaders
   - Only download files, never upload own files
 
 - Flooding cause excessive traffic
@@ -318,3 +318,189 @@ Why is ping and pong needed? P2P systems have a very high rate of churn(마구 �
   - Is there some way of maintaining meta-information(어떤 목적을 가지고 만들어진 정보) about peers that leads to more intelligent routing? -> Structured Peer-to-peer systems e.g., Chord System.
 
   
+
+## 4. FastTrack and BitTorrent
+
+### FastTrack
+
+- Hybrid between Gnutella and Napster
+- Takes advantages of "healthier" participants in the system
+- Underlying technology in Kazaa, KazaaLite, Grokster
+- Proprietary protocol, but some details available
+- Like Gnutella, but with some peers designated as ***SuperNode***
+- SuperNodes have some special duties
+
+### A FastTrack-Like System
+
+- Supernodes undertake some of the responsibilities very similar Napster. peers in the sense that they might be ***storing directory information*** that are used by its neighboring peers in the overlay to search for files
+
+### FastTrack(contd)
+
+- A supernode stores a directory listing a subset of nearby (<filename, peer pointer>), similar to napster servers
+- Supernode membership changes over time
+- Any peer can become (and stay) a supernode, provide it has earned enough ***reputation***
+  - Peers are selected to be supernodes based on their contributions the past and this contribution is decided from a reputation level
+  - Kazaalite: participation level(=reputation) of a user between 0 and 1000, initially 10, then affected by length of periods of connectivity and total number of uploads
+  - More sophisticated Reputation schemes invented, especially based on economics 
+- A peer searches by contacting a nearby supernode
+
+#### Why is there an advantage to be a supernode? what is the incentive to be a supernode?
+
+- A lot of your queries and searches now become just local searches in your local data structure or your local directory information
+- ***So they do not incur any network traffic***
+
+### BitTorrent
+
+BitTorrent is one of these systems that has been very popular and continues to be popular.
+
+1. Get tracker : Website links to .torrent
+2. Get peers from tracker: Tracker, per file.(receives heartbeats, joins and leaves from peers)
+3. Get file blocks 
+   - Seed : has full file
+   - leecher : has some blocks
+
+- Usually peers oftentimes do not contribute anything to the system
+- BitTorrent addresses this by having incentives for the peers to participate
+- so that the peers can benefit from being unselfish and helping other peers
+
+- File split into blocks(32 KB ~ 256 KB)
+- Download Local Rarest First block policy : prefer early download of blocks that are least replicated among neighbors
+  - Exception : New node allowed to pick one random neighbor : helps in bootstrapping
+- ***Tit for tat*** bandwidth usage : Provide blocks to neighbors that provided it the best download rates
+  - Incentive for nodes to provide good download rates
+  - Seeds do the same too
+- Choking : Limit number of neighbors to which concurrent uploads <= a number(5), i.e., the "best" neighbors
+  - Everyone else choked
+  - Periodically re-evaluate this set(e.g., every 10s)
+  - Optimistic unchoked: periodically(e.g., ~30 s), unchoked a random neighbor - helps keep unchoked set fresh(30초 마다 무작위 neighbor에 unchoke함 - 데이터가 더 골고루 퍼질 수 있음)
+
+## 5. Chord
+
+#### DHT = Distributed Hash Table
+
+A hash table is a data structure typically maintained inside one running process on one machine, which allows you to insert, look up, and delete objects with unique key. So you can perform these operations in essentially order 1 time or constant time.
+
+- Hash table stores these object in bucket based on a hash of the key, and this allows you to look up and perform other operations like insert and delete fairly quickly on each key
+
+> unique key < - > file
+
+A distributed hash table known as a DHT is a similar data structure except that it runs in a distributed system rather than in a single process
+
+- However, instead of storing the objects into bucket, ***you store the object at nodes or hosts or machines in a cluster***
+- A hash table allows you to insert, lookup and delete objects with keys
+- A distributed hash table allows you to do the same in a distributed setting(object = files)
+- Performance Concerns:
+  - Load balancing
+  - Fault-tolerance
+  - Efficiency of lookups and inserts
+  - Locality : you want the messages that are transmitted among the cluster to be transmitted preferably among nodes that are close by in the underlying network topology or in terms of the Internet distance underneath
+
+- napster, Gnutella, FastTrack are all DHTs(sort of) (however, not optimize)
+- So is Chord, a structured peer to peer system that we study next
+- Chord is one of the first peer to peer systems which tries to directly address this problem and tries to bring the insert, delete and lookup time down low enough that we can claim that it is, it fact, a DHT or a distributed hash table.
+
+### Comparative Performance
+
+|          | Memory                | Lookup Latency | # messages for a lookup |
+| -------- | --------------------- | -------------- | ----------------------- |
+| Napster  | O(1) (O(N) at server) | O(1)           | O(1)                    |
+| Gnutella | O(N)                  | O(N)           | O(N)                    |
+| Chord    | O(log(N))             | O(log(N))      | O(log(N))               |
+
+### Chord
+
+- Chord uses a technique where each of the nodes in the peer-to-peer overlay selects its neighbors in an intelligent fashion
+- There are certain rules that the nodes use to decide who their neighbors are. 
+- Intelligent choice of neighbors to reduce latency and message cost of routing(lookups/inserts)
+- Uses Consistent hashing on node's (peer's) address
+  - SHA-1(ip_address, port) -> 160 bit string
+  - Truncated to m bits
+  - Called peer id(number between 0 and 2^m - 1)
+  - ***Not unique but id conflicts very unlikely***
+  - Can then map peers to one of 2^m logical points on a circle
+
+### Peer Pointer (1)  : Successors (Ring of peers)
+
+If m is 7, make the number of 127 dot on circle and point it a result of hash
+
+- What are the neighbors that the peers maintain? 
+- The first type of neighbors that the peers maintain are successors
+- For example, 16 - > 32, 32 -> 45, 45 -> 80 ...  116 -> 16 can send message directly to successor
+- If need, predecessors can be used.
+
+### Peer Pointer (2) : Finger Tables
+
+The ith finger table and the peer that has peer ID n, is the first peer that has ID immediately at or to the clockwise of n + 2^i but then, taking modular 2^m
+
+ith entry at peer with id n is first peer with id >= n+2^i (mod 2^m)
+
+Example n = 80(n is ID), i  = 0
+
+- The 0 finger table at node N80. We get a 96. how?
+- 80 + 2^0(n + 2^i) that is 81 and so that is a point somewhere on the ring. The node immediately to the clockwise of that is 96, N96. That is why we say that N96 is the zero-th finger table entry at N80.
+- n + 2^i <= 96 -> finger table[i] is 96
+- A와 B 사이에 있으면 앞에 있는 것(여기서는 B) 선택
+
+### What About the Files?
+
+How do we place files, how would we decide where files get placed?
+
+- Unlike Napster, Gnutella where clients told their own files and don't upload them by default, here instead find the store in specific notes based on the same rules if your using for placing the servers on the ring.
+- In other words, you take the filing which we assume to be unique across the entire system.
+
+- Filenames also mapped using same consistent hash function
+  - SHA-1(filename) -> 160 bit string(key)
+  - ***File is stored at first peer with id greater than or equal to its key***(mod 2^m)
+  - 예를 들어 36과 45 사이에 있는 값 나오면 45에 저장 됨
+- File (cnn.com/index.html) that maps to key K42 is stored at first peer with id greater than 42(last slide, it is stored at 45)
+  - Note that we are considering a different file-sharing application here : cooperative web caching
+  - The same discussion applies to any other file sharing application, including that of mp3 files.
+- Consistent hashing => with K keys and N peers, each peer stores O(K/N) keys(i.e., < c*K/N, for some constant c)
+- K : keys, N : peers
+- O(K/N). It just means that the number of keys at a peer is less than c*K/H for some constant c with a high probability
+- It means you have good load balance across the different tiers in your system or the different nodes in your system.
+- If name is unique, peer review systems can be used for storing any kind of object.
+
+### Search
+
+Who has file? - hashes to 42 and In 45, there is the File with key K42 stored
+
+Suppose N80 wants search for file,
+
+- the first thing it does us that hashes it and trunks it to embeds, gets 42
+- It knows that it needs to route to the point 42 on the ring or rather to the point that is immediately to the north, that is immediately to that clockwise
+
+How does it do?
+
+Search algorithm is applied recursively
+
+- At node n, you have query and it is destined for key k, it this case, k is 42
+- You forward the key to the largest successor or finger table entry, essentially your largest neighbor are when i say largest it actually means it is the most to the right wrapping around the ring
+- At node n, send query for key k to ***largest successor/finger*** entry <= k.
+- ***If not exist, send query to successor(n)***
+
+- Even if the finger table entries are wrong, then as long as the successors are correct you end up routing the query to the correct server eventually
+- In finger table the most far N is N16 so N80 will forward the query to N16
+
+N80 -> N16. But still to the left of 42
+
+- You will notice that 16 will have 32 as a finger table entry because 16 + 2^4 is 32
+
+- But 16 + 2^5 is 48 which means that the fifth, the next finger table entry after 32 at 16 ***does not even know about N45's existence***
+- N16 has only two choices, 32 or 80 to forward the 32 and since 32 is to the left or counterclockwise of 42, it forwards it to 32
+
+### Analysis
+
+Search takes O(log(N)) time
+
+Proof
+
+- (intuition) : at each step, distance between query and peer-with-file reduces by a factor of at least 2
+- (intuition): after log(N) forwardings, distance to key is at most 2^m/2^(log(N)) = 2^m/N
+- Number of node identifies in a range of 2^m/N is O(log(N)) with high probability(why? SHA-1! and "Balls and Bins")  So using successors in that range will be OK, using another O(log(N)) hops
+- O(log(N)) search time holds for file insertion too(in general for routing to any key)
+  - "Routing" can thus be used as a building block for
+    - All operations: insert, lookup, delete
+- ***O(log(N)) time true only if finger and successor entries correct***
+- When might these entries be wrong?
+  - When you have failures
