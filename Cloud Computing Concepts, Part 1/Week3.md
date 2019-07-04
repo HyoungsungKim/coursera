@@ -376,7 +376,7 @@ BitTorrent is one of these systems that has been very popular and continues to b
 
 ## 5. Chord
 
-#### DHT = Distributed Hash Table
+### DHT = Distributed Hash Table
 
 A hash table is a data structure typically maintained inside one running process on one machine, which allows you to insert, look up, and delete objects with unique key. So you can perform these operations in essentially order 1 time or constant time.
 
@@ -504,3 +504,256 @@ Proof
 - ***O(log(N)) time true only if finger and successor entries correct***
 - When might these entries be wrong?
   - When you have failures
+
+## 6. Failures in Chord
+
+### Search under peer failures
+
+When you have peers that fail, the lookups might go wrong.
+
+- One of the solution to this is for nodes to ***maintain not just one successor entry but multiple successor entries,*** the nodes maintain up to successor entries where r is a fixed number systemwide but is a configurable number.
+- How large does r need to be?
+- Queries to be routed correctly in spite of a large number of failures?
+- It turns out that r = 2log(N) or O(log(N)) suffices to maintain lookup correctness with high probability(w.h.p)
+- Mechanism we are using here is that a node goes through its successors and if it finds at least one successor alive then it forwards a query to that successor, and if this happens at every node in the system that is alive, then we consider that the query forwarded
+
+- Choosing r = 2log(N) suffices to maintain lookup correctness w.h.p(i.e. ring connected)
+
+  - Suppose 50% of nodes fail
+  - Pr(at given node, at least one successor alive) =
+
+  $$
+  1 - (\frac{1}{2})^{2logN} = 1 - \frac{1}{N^2}
+  $$
+
+  1 - p^r, p^r : r개 모두 실패 할 확률
+
+  - Pr(above is true at all alive nodes) = 
+    $$
+    (1 - \frac{1}{N^2})^{N/2} = e^{-\frac{1}{2N}} \approx 1
+    $$
+
+  - This is saying that as the number of nodes or peers in your system scales up as your system becomes larger, the probability of lookup correctness will in fact increase and go closer and closer to 1, which is a very good thing. - This shows that the system is fairly scalable
+
+  The other thing that could go wrong is that the node or the peer storing the file might itself fail.
+
+  > 만약 파일 가지고 있는 노드에서 fail 발생하면 파일이 없는 것 처럼 됨
+
+  
+
+  - The way to combat this is to replicate the file.
+    - So you store multiple copies of the file, one at N45, but also some at its successors and predecessors.
+  - If you have a key that is very popular, for instance, you are storing a file that is an mp3 of a recently released song that is in tho top5, then file is likely to receive a lot of queries and so if you spread this file out over multiple replicas, the load on each of these replicas also goes down 
+
+### Need to deal with dynamic changes
+
+- Peer fail
+- New peers join
+- Peer leave
+  - P2P systems have a high rate of churn(node join, leave and failure)
+    - 25% per hour in Overnet(eDonkey)
+    - 100% per hour in Gnutella
+    - Lower in managed clusters
+    - Common feature in all distributed systems, including wide-area(e.g., PlantLab), clusters(e.g., Emulab), clouds(e.g., AWS), etc
+
+So, all the time, need to update successors and fingers and copy keys
+
+### New Peer Joining
+
+- Introducer direct to N40 to N45(and N32)
+- N32 updates successor to N40
+- N40 initialized successor to N45, and inits fingers from it
+- N40 periodically talks to neighbors to update finger table -> Stabilization Protocol
+- Stabilization Protocol runs in background
+
+> The stabilizing protocol which runs periodically at each node, the node asks its immediate neighbors finger table entries as well as successors, for their finger table entries and successors.
+>
+> This gives it a larger population of peers to consider as its potential neighbors and this over time lead to more and more correct finger table entries and successors for the node.
+
+New peer(N40) need to copy some files/keys from N45(files with fileID between 32 and 40)
+
+- Remember that the invariant for keys was that the key or the files stored at the first peer that is immediately to the clockwise of the key
+- So key like 34 and 38 which were previously stored at N45, will now need to be stored at N40, because 40 is now first peer immediately to the clockwise of 34 and 38.
+
+- A new peer affects O(log(N)) other finger entries in the system, on average[Why?]
+- Number of messages per peer join = O(log(N)*log(N))
+- Similar set of operations for dealing with peers leaving
+  - For dealing with failures, also need failure detectors
+
+### Stabilization Protocol
+
+- When you have concurrent peer joins, leaves and failures, you don't just have one node joining and leaving in
+- Concurrent peer joins, leaves, failures might cause loopiness of pointers and failure of lookups
+  - Chord peers periodically run a stabilization algorithm that checks and updates pointers and keys
+  - Ensures non-loopiness if fingers, eventual success of lookups and O(log(N)) lookups w.h.p
+  - Each stabilization round at a peer involves a constant number of messages
+  - Strong stability takes O(N^2) stabilization rounds
+    - Stabilization were run periodically at nodes, one of the things is the stabilization at each node is independent of the stabilization at the other nodes.
+    - So they are not synchronized with each other and yet it takes O(N^2) stabilization rounds across nodes
+
+### Churn(노드들이 들어왔다 나갔다 실패했다 난장판인 상태)
+
+- When nodes are constantly joining, leaving, failing
+  - Significant effect to consider; traces from the Overnet system show hourly peer turnover rates(churn) could be 25~100% of total number of nodes in system
+  - Leads to excessive(unnecessary) key copying(remember that keys are replicated)
+  - Stabilization algorithm may need to consume more bandwidth to keep up
+  - Main issue is that files are replicated, while it might be sufficient to replicate only meta information about files
+  - Alternatives
+    - Introduce a level of indirection(any p2p system)
+    - Replicate metadata more, e.g., Kelips(later in this lecture series)
+
+### Virtual Nodes
+
+- Hash can get non-uniform -> bad load balancing
+  - Treat each node as multiple virtual nodes behaving independently
+  - Each joins the system
+  - Reduce variance of load imbalance
+
+### Wrap-up notes
+
+- Virtual Ring and Consistent hashing used in Cassandra, Riak, Voldemort, DynamicDB, and other key-value stores
+- Current status of Chord project:
+  - File system(CFS, Ivy) built on top of Chord
+  - DNS lookup service built on top of Chord
+  - Internet Indirection Infrastructure(I3) project at UCB
+  - Spawned research on many interesting issues about p2p systems
+
+## 7. Pastry
+
+Another p2p system that came out of academia
+
+### Pastry
+
+- Assigns ids to nodes, just like Chord(using a virtual ring) using consistent hashing function.
+- you can imagine a virtual ring where peers are hashed onto a point on the ring.
+- Leaf Set - Each node knows its successor(s) and predecessor(s)
+
+### Pastry Neighbors
+
+- Routing tables based prefix matching
+  - Think of a hypercube
+- Routing is thus based on prefix matching, and is thus log(N)
+  - And hops are short(in the underlying network)
+
+###  Pastry Routing
+
+- Consider a peer with id 01110100101. It maintains a neighbor peer with an id matching each of the following prefixes(* = starting bit differing from this peer's corresponding bit)
+  - \* : 첫 bit부터 다를 때
+  - 0* : 첫 bit만 일치 할 때
+  - 01*
+  - 011*
+  - ...0111010010*
+- When it needs to route to a peer, say 01110111001, it starts by forwarding to a neighbor with the largest matching prefix, i.e., 011101*
+
+### Pastry Locality
+
+Prefix matching is nice because it allows you to be aware of the underlying network distances
+
+- For each prefix, say 011*, among all potential neighbors with a matching prefix, the neighbor with the shortest round-trip-time is selected
+- Among all these potential neighbors(peers which have same prefix) you select that neighbor which has the shortest round-trip time in the underlying network
+- Since shortest prefixes have many more candidates(spread out throughout the Internet), ***the neighbors for shorter prefixes are likely to be closer than the neighbors for longer prefixes.***
+- Thus, in the prefix routing, early hops are short and later hops are longer
+- Yet overall "stretch", compared to direct Internet path, stays short
+- When you use prefix routing, this means that the first few hops, the early hops in the query are in fact very short hops, and the later hops are much longer hops in the underlying network.
+- However you can show as the original authors and designers have shown that the overall stretch compared to the direct Internet path between the querying node and the eventual destination node is in fact very small and is just a constant factor
+- It  means that pastry, in spite of being able to route via many intermediate peers, is able to get you end-to-end, round-trip time which is comparable to the underlying Internet round-trip time between the querying node and the eventual destination node
+
+### Summary of Chord And Pastry
+
+- Chord and Pastry protocols
+  - More structured than Gnutella
+  - Black box lookup algorithms
+  - Churn handling can get complex
+  - O(log(N)) memory and lookup cost
+    - O(log(N)) lookup hops may be high
+    - Can we reduce the number of hops?
+
+## 8. Kelips
+
+Kellips : bring constant lookup cost a distributed hash table
+
+### Kelips - A 1 hop Lookup DHT
+
+- In Kellips, we don't use a virtual ring.
+
+- Instead we use affinity groups.
+
+- Each node or each peer is hashed to group
+
+- You take hash using, SHA-1 and then you take modulo k, k being an integer
+
+- For example, peer ID 160 would get hashed to group #1 because that is what hash mod k gave it peer number 18 gets hashed to group #1.
+
+  > k의 modulo 연산으로 그룹 나눔. 그룹은 0 ~ k-1개, k는 squareroot(N)
+
+  
+
+- k "affinity groups"
+
+- k ~ squareroot(N)
+
+- Each node hashed to a group(has mod k)
+
+- Node's neighbors
+
+  - (Almost) all other nodes in its own affinity group
+  - One contact node per foreigner affinity group
+
+-  Since k = squareroot(N), each peer has squareroot(n-1) contact, in each of the other affinity groups.
+
+### Kelips Files And Metadata
+
+Unlike in Chord and Pastry, the files do not get stored at the nodes in the affinity groups. ***Instead, they get stored at whichever peer uploaded them just like Napster or Gnutella.*** so you decouple(분리시키다) the file replication location from the file querying.
+
+- File can be stored at any (few) node(s)
+- Decouple file replication/location(outside Kelips) from file querying (in Kelips)
+- Each filename hashed to a group
+  - You take the file name and hash it to a group
+  - All nodes in the group replicate pointer information, i.e., <filename, file location>
+  - Affinity group does not store files
+
+For instance, if PennyLane.mp3 hashes to k - 1
+
+- ***Everyone in this group stores <PennyLane.mp3, who-has-file>***
+- You are not replication the file itself;
+- you are only replicating meta information about the file which is very very small typically just a few bytes or few tens of bytes
+
+### Kelips Lookup
+
+- Lookup
+  - Find file affinity group
+  - Go to your contact for the file affinity group
+  - Failing that try another of your neighbors to find a contact
+- Lookup = 1 hop(or a few) - Best case
+  - Memory cost O(squareroot(N))
+- 1.93 MB for 100K nodes, 10M files
+- Fits in RAM of most workstations/laptops today(COTS machines)
+
+- Affinity group members in k - 1, 160(name of peer in affinity group) could select that affinity group member that is the closest to it, it the underlying round-trip time in the underlying Internet, and that means that this hop could, it fact, be a very quick hop in the system.
+- What the system Kelips is doing is that it is replicating mate-information enough across the entire network so that at a querying peer- any querying peer, you can obtain information about any file from one of your neighboring, very nearby peers, nearby in the internet round-trip, time, distance space
+
+### Kelips Soft State(update)
+
+- Membership lists
+  - ***Gossip-based membership***
+  - Within each affinity group
+  - And also across affinity groups
+  - O(log(N)) dissemination time
+- File metadata
+  - Needs to be periodically refreshed from source node
+  - Times out
+
+- Even if information is out of date, this system works just fine because it has other ways to find information
+- In Kelips, you have many different choices. can ask to another nodes
+- If you have a file that is stored in the system, you need to periodically send out heartbeats to keep that information fresh.
+- You never need to delete files. You simply stop sending hearbeats for that file and meta-information from that file will disappear quickly over time across all the nodes in the system.
+
+### Chord vs pastry vs Kelips
+
+- Range of trade-offs available
+  - Memory vs lookup cost vs background bandwidth(to keep neighbors fresh)
+
+- Kelips
+  - Uses slightly more memory than Chord or Pastry and slightly more background bandwidth, to keep neighbors a fresh.
+  - But has a much shorter lookup cost
+  - O(square-root(N)) for memory and O(1) for lookup cost
