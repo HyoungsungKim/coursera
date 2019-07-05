@@ -513,7 +513,7 @@ Piggyback: Whenever processes receive these message, they do the same as they di
   - packet losses, e.g., from congestion
 - Indirect pinging may not solve the problem
   - e.g., corrected message losses near pinged host
-- Key: suspect a process before declaring it as failed in the group
+- Key: suspect a process(ask again to other process) before declaring it as failed in the group
 
 In other words, you use a state machine where pi maintains a state machine for a given other process, pj which is present in its membership list. In addition, you start disseminating via the SWIM piggyback message the fact that you are suspecting process pj.
 
