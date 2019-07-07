@@ -196,3 +196,165 @@ In a nutshell:
     - This allows each datacenter do its own quorum and it supports hierarchical replies where the replicas in each datacenter
     - Resend a message back to that datacenters coordinator and then that sends message back to ACKs back to the clients coordinator in the clients contact datacenter and then that coordinator can then send back an ACK to the client itself
     - client -> client coordinator -> each datacenter -> back to client coordinator -> client
+
+## 1.4 The Consistency Spectrum
+
+### Consistency Spectrum
+
+Eventual < - > Strong
+
+- Eventual : Faster reads and writes
+- Strong(e.g., Sequential) : More consistency
+
+Cassandra offers Eventual Consistency
+
+- If writes to a key stop, all replicas of key will converge(Typically they will converge the latest written value)
+- Originally from Amazon's Dynamo and LinkedIn's Voldmort systems
+
+### Newer Consistency Models
+
+- Striving towards strong consistency
+- While still trying to maintain high availability and partition-tolerance
+
+Per-key sequential
+
+- You could ensure this by maintaining a per-key coordinator and ensuring that all the reads and writes are serialized through the coordinator and therefore ***they have a single global order.***
+- This may be restrictive because if that coordinator fails and you need free like another coordinator, however it does guarantee some stronger notion of consistency
+- Per-key, all operation have a global order
+
+CRDTs(Commutative Replicated Data Types)
+
+commutative : 교환 가능한
+
+- Data structures for which commutated writes give same result
+- Commutating writes means that if you reverse the order of two writes, then the end result is the same  
+- For instance, if your data structure which is an integer, and the only operation allowed on the data in there is a + 1, essentially this is what is known as a counter. a counter is a commutative data type.
+  - If you have two writes coming in from two different clients, each of those writes is essentially a + 1 operation
+  - If client one's operation goes first and then client two's operation is applied, you get the same result, which is a + 2, as if you applied client two's operation first and then client one's operation, you will again get a + 2
+- e.g., value == int, and only op allowed is + 1
+- Effectively, servers don't need to worry about consistency
+  - If you have a CRDT the servers really do not need to worry about ordering the writes with respect to each other; all the writes have the same effect
+  - Or rather, all the writes can be commutated with  each other and the end result of any permutation of these writes is the same as any other permutation
+- CRTDs has been extended to not just counters, which are the simplest notion, but also other complicated data structures such as document which are shared and are being written and read by multiple users at the same time.
+
+Red-Blue consistency
+
+- It is not always possible to write operations or transactions on the client's side which only have commutated the commutative property
+- There are some operations that absolutely need and require to be ordered all the data centers in the same order
+- Rewrite client transactions to separate operations into red ops vs blue ops
+  - Blue ops can be executed(commutated) in any order across Datacenters
+  - Red ops need to be executed in the same order at each datacenter
+  - By rewriting the original client transactions into read and blue operations, you can support a stringer notion of consistency while still supporting some notions of availability
+
+Causal Consistency : Reads must respect partial order based on information flow
+
+- Causal flows help return same value without direct communicate
+- Return the latest value of key
+- Causal consistency says that reads obey causality and they return the latest causally written value by client
+- However, there might be multiple causally written values as you see elsewhere in this course and the causal consistency allows a read to return one of potentially many different, written values and so it is not as strong as the strongest notion of consistency but it is quite close
+
+### Strong Consistency Model
+
+There are two major strong consistency model. One is linearizability and the other is sequential consistency
+
+- Linerarizability : Each operation by a client is visible(or available) instantaneously to all other clients
+  - One of the strongest notions of consistency which says that each operation by client is visible or is available instantaneously and when i say instantaneously i mean in real time to all the other clients.
+  - ***This is as if there were only one copy of every key value pair,*** and they were being stored on exactly one server. so this is one of the strongest notions of consistency. ***However it is very difficult to support distributed systems.***
+  - Instantaneously in real time
+- Sequential Consistency:
+  - "... the result of any execution is the same as if the operations of all the processor were executed in some sequential order. and the operations of each individual processor appear in this sequence in the order specified by its program"
+  - This is an after the-fact way of reordering the operations that occurred so that there is still sanity in tis new ordering and the sanity also obeys the order at each client
+  - This reordering obeys things like causality, it obeys clients being able to read their own writes and it also obeys the ordering-the linear ordering at each client itself
+  - After the fact, find a "reasonable" ordering of the operations(can re-order operations) that obeys sanity(consistency) at all clients, and across clients
+- Transaction ACID properties, e.g., newer key-value/NoSQL stores(sometimes called"NewSQL")
+  - Hyperdex
+  - Spanner
+  - Transaction chains
+
+## 1.5 HBase
+
+### HBase
+
+- Google's BigTable was first "blob-based" storage system
+- yahoo! Open-sourced it -> HBase
+- Major Apache project today
+- Facebook uses HBase internally
+- API functions
+  - Get/Put(row)
+  - Scan(row range, filter) - range queries
+    - For instance, you might fetch all the users whose names start with A and B
+  - MultiPut
+- Unlike Cassandra, HBase prefers consistency(over availability)
+
+### HBase Architecture
+
+- Zookeeper : Small group of servers running Zab, a consensus protocol(Paxos-like)
+
+### HBase Storage Hierarchy
+
+- HBase Table
+  - Split it into multiple ***regions*** : replicated across servers
+  - Because you don't want store the entire table, some tables might be large, other tables might be small, you don't want to store large tables as one you want to split them into regions so that they are more manageable
+  - These regions are a collection of rows in that HBase Table
+    - ColumnFamily = subset of columns with similar query patterns
+    - It is within the tables so all the regions for a table contain the same set of columns within their corresponding column families
+    - One ***Store*** per combination of ColumnFamily + region
+    - Every ColumnFamily within a region, you maintain a store.
+      - ***MemStore*** for each Store : in-memory updates to Store: flushed to disk when full
+      - This is like the MemTable we discussed in Cassandra
+        - ***StoreFiles*** for each store for each region: where the data lives
+          - ***HFile***
+- HFile
+  - SSTable from Google's BigTable
+
+### HFile
+
+- HFile contains a lot of data followed by more data 
+- And then there might be some metadata, file information, indices, and a trailer information at the end
+  - Data : Data itself contains a magic number to identify that uniquely, followed by a variety of key value pairs
+    - Key-value pair : Key-value pair contains information such as the key length first, then the value lengths and the the row length. so you know how many bytes each of these contain.
+      - row : particular application which maintains. for instance, census information might be the social security number of that particular individual
+      - ColumnFamily length
+      - ColumnFamily : demographic information
+      - ColumnQualifier
+      - TimeStamp
+      - keyType
+      - value
+      - etc...
+
+### Strong Consistency: HBase Write-Ahead Log
+
+HLog is maintained on-a-on a per HRegion server basis
+
+client -> HReigionServer 
+
+- -> HRegion ->  Write in HLog first before actual writing and write in MemStore
+- If there is a failure after writing into the log, then you can replay this write by looking into your HLog
+- Corresponding operation is sent to the store, which then writes into the MemStore
+- When the MemStore is full, it is flushed into a store file in store. and that is stored as an Hfile or HDFS
+- Log flush in HReigionServer -> HLog
+
+### Log Replay
+
+- After recovery from failure, or upon bootup(HRegion/Service/HMaster)
+  - Replay any table stale logs(use timestamps to find out where the database is w.r.t(write respect to) the logs)
+  - Replay : add edits to the MemStore, which eventually will get flushed into HFiles themselves.
+
+### Cross-Datacenter Replication
+
+- Single "Master" cluster
+- Other "Slave" cluster replicate the same tables
+- Master cluster synchronously sends HLogs over to slave clusters, which then use the logs to simply update the corresponding MemStores, which eventually get flushed to disk
+- The Coordination among clusters(master and slave) is done via Zookeeper
+- Zookeeper can be used like a file system to store control information
+  - Zookeeper not just runs a Paxos-like consensus protocol, it also can be used to store information like a file system in a hierarchical fashion
+  - For instance, you can use the address "/hbase/replication/state"to store the current state of the database
+
+### Summary
+
+- Traditional Database(RDBMSs) work with strong consistency, and offer ACID
+- ***Modern workloads don't need such strong guarantees, but do need fast response times(availability)***
+- Unfortunately, CAP theorem
+- Key-value/NoSQL systems offer BASE
+  - Eventual consistency, and a variety of other consistency models striving towards strong consistency
+  - Because the workloads don't necessarily require them but at the same time they are able to grant very good response times
