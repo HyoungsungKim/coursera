@@ -28,7 +28,7 @@ We used this magic value of X, which is specified by the client alongside every 
 
 ### Why is partition-tolerance important?
 
-- Partitions can happen across datacenters when the internet gets disconnected
+- Partitions can happen across datacenters when the Internet gets disconnected
   - Internet router outages
   - Under-sea cables cut
   - DNS not working
@@ -358,3 +358,171 @@ client -> HReigionServer
 - Key-value/NoSQL systems offer BASE
   - Eventual consistency, and a variety of other consistency models striving towards strong consistency
   - Because the workloads don't necessarily require them but at the same time they are able to grant very good response times
+
+## 2.1 Introduction and Basics
+
+We will look at time in distributed systems. Time is a very important and challenging concept.
+
+### Why Synchronization?
+
+- You want to catch a but at 6.05 PM, but your watch is off by 15 minutes
+  - What if your watch is late by 15 min?
+    - You will miss the bus
+  - What if your watch is Fast by 15 min?
+    - You will end up unfairly waiting for longer time ethan you intended
+- Time synchronization is required for both
+  - Correctness
+  - Fairness
+
+### Synchronization In The Cloud
+
+- Cloud airline reservation system
+- Server A receives a client request to purchase last ticket on flight ABC123
+- Server A timestamps purchase using local clock 9h:15m:32.45s, and logs it. Replies ok to client
+- That was the last seat. Server A sends message to Server B saying "flight full"
+- B enters "Flight ABC 123 full" + its own local clock value (which reads 9h:10m10.11s) into its log
+- Server C queries A's and B's logs Is confused that a client purchased a ticket A after flight become full at B
+- This may lead to further incorrect actions by C  
+
+> A와 B의 기준 시간이 달라서 C가 혼동을 겪고 있음
+
+### Why is it Challenging?
+
+- End hosts in Internet-based systems(like clouds)
+  - Each have their own clocks
+  - Unlike processors(CPUs) within one server or workstation which share a system clock
+- Processes in Internet-based system follow an asynchronous system model
+  - No bound on
+    - Message delays
+    - Processing delays
+  - Unlike multi-processor(or parallel) systems which follow a synchronous system model
+
+### Some Definitions
+
+- An Asynchronous Distributed System consists of a number of processes
+- Each process has a state (value of variables)
+- Each process takes actions to change its state, which may be an instruction or a communication action(send, receive).
+- An event is the occurrence of an action
+- Each process has a local clock - events within a process can be assigned timestamps, and thus ordered linearly
+- But - in a distributed system, we also need to know the time order of event across different processes
+
+### Clock Skew vs Clock Drift
+
+- Each process (running at some end host) has its own clock
+- When comparing two clocks at two processes:
+  - Clock Skew = Relative Difference in clock values of two processes
+    - ***Like distance between two vehicles on a road***
+  - Clock Drift = relative Difference in clock frequencies (rates) of two processes
+    - ***Like difference in speeds of two vehicles on the road***
+- A non-zero clock skew implies clocks are not synchronized
+- A non-zero clock drift causes skew to increase (eventually)
+  - If faster vehicle is ahead, it will drift away
+  - If faster vehicle is behind, it will catch up and then drift away
+
+> **Skew : 거리
+>
+> Drift : 속도
+>
+> 이렇게 생각하면 편함
+
+### How Often To Synchronize?
+
+- Maximum Drift Rate(MDR) of a clock
+- Absolute MDR is defined relative to Coordinated Universal Time(UTC). UTC is the "correct" time at any point of time.
+  - MDR of a process depends on the environment
+- Max drift rate between two clocks ***with similar MDR*** is 2 * MDR
+  - Why?
+  - Because the worst case, one of these clocks may be MDR ahead or faster than UTC. The other clock may be MDR slower than UTC, and so the relative difference between them is (2 * MDR).
+  - 기준점(UTC)에서 오른쪽 + 왼쪽 = MDR + MDR = 2 * MDR (Because similar MDR is given)
+- ***Given a maximum acceptable skew M between any pair of clocks,*** need to synchronize at least once every: M / (2 * MDR) time units
+- Since time = distance/speed
+
+### External vs Internal Synchronization
+
+- Consider a group of processes
+- External Synchronization
+  - Each process C(i)'s clock is within a bound D of a well-known clock S external to the group
+  - |C(i) - S| < D at all times
+  - External clock may be connected to UTC(universal Coordinated Time) or an atomic clock
+  - e.g.,Christian's algorithm, NTP
+- Internal Synchronization
+  - every pair of processes in group have clocks within bound D
+  - |C(i) - C(j)| < D at all times and for all processes i, j
+  - E.g., Berkeley algorithm
+
+- ***External Synchronization with D => Internal Synchronization with 2 \* D***
+- Internal Synchronization does not imply External Synchronization
+  - ***In fact, the entire system may drift away from the external clock S!***
+
+## 2.2 Cristian's Algorithm
+
+One of the algorithms for external synchronization of clocks
+
+### Basics
+
+- External time synchronization
+- All processes P synchronize with a time server S
+
+### What is Wrong
+
+- By the time response message is received at P, time has moved on
+  - P의 request에 S가 respone를 보낸뒤에도 계속 시간이 흐르고 있기 때문에 clock이 완전히 일치 할 수가 없음.(latencies)
+- P's time set to t is inaccurate
+- Inaccuracy a function of message latencies
+- Since latencies unbounded in an asynchronous systems, the inaccuracy cannot be bounded
+
+### Christian's Algorithm
+
+- ***P measures the round-trip-time(RTT) of message exchange***
+- Suppose we know the minimum P -> S latency min 1
+- And the minimum S -> P latency min 2
+  - min 1 and min 2 depend on Operating system overhead to buffer messages, TCP time to queue messages, etc
+  - If you don't know what min1 and min2 are you can just set them to be zero, that is fine
+  - This allows you to incorporate any known minimum overheads on the transmission pads into the error and account for them in the error and retain a better error bound
+- The actual time at P when it receives response is between ***[t + min2, t + RTT-min1]***
+
+- P sets its time to halfway through this interval
+  - To: t + (RTT + min2 - min1)/2
+- Error is at most(RTT-min2-min1)/2
+  - Bounded! 
+
+### Gotchas
+
+- Allowed to increase clock value but should never decrease clock value
+  - may violate ordering of event within the same process
+- Allowed to increase or decrease speed of clock
+- If error is too high, take multiple readings and average them
+
+## 2.3 NTP
+
+###  NTP = Network Time Protocol
+
+- NTP Servers organized in a tree
+- Each Client = ***a leaf of tree - Primary servers -> Secondary servers -> Tertiary servers***
+- Each node synchronizes with its tree parent
+
+### Why O = (tr1 - tr2 + ts2 - ts1) / 2
+
+- Offset o = (tr1 - tr2 + ts2 - ts1)/2
+- Let's calculate the error
+- Suppose real offset is oreal
+  - Child is ahead of parent by oreal
+  - Parent is ahead of child by -oreal (opposite direction)
+- Suppose one-way latency of Message 1 is L1 (L2 for message 2)
+- No one knows L1 or L2!
+- Then 
+  - tr1 = ts1 + L1 + oreal
+  - tr2 = ts2 + L2 - oreal
+
+- Subtracting second equation from the first
+  - oreal = (tr1 - tr2 + ts2 - ts1)/2 + (L2 - L1)/2
+  - => oreal = o + (L2 - L1)/2
+  - => |oreal - o| < |(L2 - L1)/2| < |(L2 + L1)/2|
+  - Thus, the error is bounded by the round-trip-time
+
+#### And Yet
+
+- we still have a non-zero error!
+- We just can't seem to get rid of error
+  - Can't , as long as message latencies are non-zeros
+- Can we avoid synchronizing clocks altogether, and still be able to order events?
