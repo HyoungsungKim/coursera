@@ -520,9 +520,139 @@ One of the algorithms for external synchronization of clocks
   - => |oreal - o| < |(L2 - L1)/2| < |(L2 + L1)/2|
   - Thus, the error is bounded by the round-trip-time
 
-#### And Yet
+### And Yet
 
 - we still have a non-zero error!
 - We just can't seem to get rid of error
   - Can't , as long as message latencies are non-zeros
 - Can we avoid synchronizing clocks altogether, and still be able to order events?
+
+## 2.4 Lamport Timestamps
+
+Lamport Timestamps or logical timestamps, one of the most important building blocks in cloud computing systems and kind of distributed systems.
+
+### Ordering Event in a Distributed Systems
+
+- To order event across process, trying to sync clocks is one approach
+- What if we instead assigned timestamps to event that were not absolute time?
+- As long as these timestamps obey causality, that would work?
+  - If an event A causally happens before another event B, then timestamp(A) < timestamp(B)
+  - Human use causality all the time
+    - e.g., I enter a house only after I unlock it
+    - e.g., You receive a letter only after I send it
+
+### Logical (Or Lamport) Ordering
+
+- Proposed by Leslie Lamport in the 1970s
+- Used in almost all distributed systems since then
+- Almost all cloud computing systems use some form of logical ordering of events
+- -Define a logical relation Happens-Before among pairs of events
+- Happens-Before denoted as ->
+- Three rules
+  1. On the Same process: a -> b, if time(a) < time(b) (using the local clock)
+  2. If p1 sends m to p2 : send(m) -> receive(m)
+  3. (Transitivity) If a -> b and b -> c then a -> c
+- Creates a partial order among events
+  - Not all event related to each other via -> 
+  - For instance, if processes never exchange messages with each other, then all the events are called as concurrent events, they're not related to each other at all, across different processes
+    - Event within a process all still related using the happens-before but across processes, you do not have the happens-before relationship at all.
+
+### In Practice: Lamport Timestamps
+
+- Goal: Assign logical (Lamport) timestamp to each event
+- Timestamps obey causality
+- Rules
+  - Each process uses a local counter(clock) which is an integer
+    - initial value of counter is zero
+  - A process increments its counter when a send or an instruction happens at it. ***The counter is assigned to the event as its timestamp***
+  - A send(message) event carries its timestamp
+  - For a receive (message) event the counter is updated by max(local clock, message timestamp)+1
+
+> 각 process는 counter(initial counter = 0) 를 갖고, instruction이 발생 할 때마다 1씩 증가 시킴.
+>
+> send 할 때 counter(== timestamp)를 같이 보냄
+>
+> receive는 local-clock과 받은 timestamp(message timestamp) 중 큰 값 + 1로 timestamp 업데이트 함
+
+### Not Always Implying Causality
+
+concurrent event : ***If processes never exchange messages with each other, then all the events are called as concurrent events,*** they're not related to each other at all, across different process. Events within a process all still related using the Happens-before but across processes, you do not have the happens-Before relationship at all.
+
+### Concurrent Events
+
+- A pair of concurrent events doesn't have a causal path from one event to another(either way, in the pair)
+- Lamport timestamps not guranteed to be ordered or unequal for concurrent events
+- Ok, since concurrent events are not causality relatd!
+- Remember
+  - E1 -> E2 => timestamp(E1) < timestamp(E2),
+  - BUT timestamp(E1) < timestamp(E2) => {E1 -> E2} or {E1 and E2 concurrent}
+- ***Lamport timestamps are very causality but they don;t always identify concurrent events***
+
+## 2.5 Vector Clocks
+
+Vector clock : another way of assigning timestamps to events in a distributed system
+
+### Vector Timestamps
+
+- Vector timestamps are used in cloud computing systems such as Riak
+- Used in key-value stores like Riak
+- Each process uses a vector of integer clocks
+- Suppose there are N processes in the group 1..N
+- Each vector has N elements
+- Process i maintains vector Vi[1,...,N]
+- jth element of vector clock at process i, Vi[j], is i's knowledge of latest events at process j
+
+> N개의 프로세스 존재하면 각 프로세스는 N길이의 벡터를 가짐
+>
+> 다른 프로세스에서 메세지 전달 받으면 자신의 clock 유지하면서 send한 프로세스 index에 있는 벡터값을 업데이트
+>
+> Ex> p2(0,0,0)이 p1(2,0,0) 메세지 받으면 p2(2,1,0)로 업데이트
+
+### Assigning Vector Timestamps
+
+- Incrementing vector clocks
+  1. On an instruction or send event at process i, it increments only its ith element of its vector clock
+  2. Each message carries the send-event's vector timestamp V_message[1,..,N]
+  3. On receiving a messages at process i:
+     1. Vi[i] = Vi[i] + 1
+     2. Vi[j] = max(V_message[j],Vi[j]) for j != i
+
+### Causally-Related
+
+- VT1 = VT2
+  - iff(if and only if)
+    - VT1[i] = VT2[i], for all i = 1, ...,N
+- VT1 <= VT2,
+  - iff VT1[i] <= VT[2][i], for all i = 1,...,N
+- Two events are causally related iff
+  - VT1 < VT2, i.e.,
+    - iff VT1 <= VT2 &
+      - There exists j such that 1 <= j <= N & VT1[j] < VT2[j]
+
+### ... Or Not Causally-Related
+
+- Two events VT1 and VT2 are concurrent
+  - iff Not(VT1 <= VT2) AND NOT (VT2 <= VT1) We will denote this as VT2 ||| VT1
+
+>  벡터에서 한쪽의 모든 원소가 다른 원소보다 크거나 같아야 하는데 그렇지 않으면 concurrent임
+
+### Logical Timestamps: Summary
+
+- Lamport timestamps
+  - Integer clocks assigned to events
+  - Obeys causality
+  - Cannot distinguish concurrent events
+- Vector timestamps
+  - Obey causality
+  - By using more space, can also identify concurrent events
+
+### Time And Ordering: Summary
+
+- Clocks are unsynchronized in an asynchronous distributed system
+- But need to order events, across processes!
+- Time synchronization
+  - Cristian's algorithm
+  - NTP
+  - Berkeley algorithm : using synchronization only within the group, but in all of these cases, when you have a non-zero latencies in the underlying network, you are going to have an error in the clock that you set
+  - ***But error a function of round-trip-time***
+- Can avoid time sync altogether by instead assigning logical timestamps to events

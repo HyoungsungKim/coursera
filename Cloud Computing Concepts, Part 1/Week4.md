@@ -186,7 +186,7 @@ Why useful?
   - The server is placed to the point in the ring.
   - The key get stored at servers that are successors to its point on the ring.
   - For example, key is 13 and node is 16, 32, 45, 80, 96, 112, then key is stored at 16, 32, 45(one of theses might be the primary replica and the others might be backup replicas)
-  - As Cassandra is concerne, it doesn't necessarily need to have primary backup replicas, or need to know the initial primary or backup replicas, ***it just knows them as replicas***
+  - As Cassandra is concern, it doesn't necessarily need to have primary backup replicas, or need to know the initial primary or backup replicas, ***it just knows them as replicas***
   - ***The client sends its queries to one of the servers in the system.*** ***the server is called the coordinator.*** and the coordinator need not be on a per data center basis
   - It could be on a per client basis, on a per query basis, it doesn't really matter
   - If you have Cassandra running in two different data centers, ***each of those data centers would be using a separate ring with its own servers mapped to that ring.***
