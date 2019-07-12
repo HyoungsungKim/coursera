@@ -141,3 +141,122 @@ The algorithm is terminated when all the processes have calculated their states 
 
 - Global Snapshot calculated by Chandy-lamport algorithm is causally correct
   - What?
+
+### 1.3 Consistent Cuts
+
+#### Cuts
+
+- Cut = time for frontier at each process and at each channel
+- Events at the process/channel that happen before the cut are "in the cut"
+  - And happening after the cut are "out of the cut"
+
+#### Consistent Cuts
+
+Consistent Cut : a cut that obeys causality
+
+- A cut C is a consistent cut if and only if :
+  - for (each pair of events e, f in the system)
+    - Such that event e is in the cut C, and if f -> e (f happens-before e)
+      - Then : Event f is also in the cut C
+
+> cut 내부에 있는 것끼리 message 주고 받을 때, cut 내부에서 밖으로 메세지 보낼때(왼쪽에서 오른쪽) 
+> -> consistent cut
+>
+> cut 내부에서 외부로 나갈때 (오른쪽에서 왼쪽으로)
+> -> Cut but Inconsistent cut
+
+Consistent cut shown by this green dotted line is in face the same as the state captured by the Global Snapshot algorithm
+
+#### In fact...
+
+- Any run of the Chandy-Lamport Global Snapshot algorithm creates a consistent cut
+
+#### Chandy-Lamport Global Snapshot Algorithm Creates A Consistent Cut
+
+Let's quickly look at the proof
+
+- Let ei and ej be events occurring at Pi and Pj, respectively such that
+  - ei -> ej (ei happens before ej)
+- The snapshot algorithm ensures that
+  - If ej is in the cut then ei is also in the cut
+- That is : if ej -> \<Pj records its state>, then
+  - it must be true that ei -> \<Pi records its state>.
+- If ej -> \<Pj records its state>, then it must be true that ei -> \<Pi records its state>. (True)
+  - By contradiction, suppose ej -> \<Pj records its state> and \<Pi records its state> -> ei (False)
+  - Consider the path of app messages (through other processes) that go from ei -> ej
+  - Due to FIFO ordering, markers on each link in above path will precede regular app messages
+  - Thus, since \<Pi records its state> -> ei, it must be true that Pj received a marker before ej
+  - Thus ej is not in the cut => contradiction
+
+### 1.4 Safety and Liveness
+
+In this lecture, we will see two very important properties that are desired in distributed systems these properties are called ***safety*** and ***liveness***
+
+#### "Correctness" in Distributed Systems
+
+- Can be seen in two ways
+- Liveness and Safety
+- ***Often confused - it is important to distinguish from each other***
+
+#### Liveness: Exercise
+
+- Liveness = guarantee that something good will happen, eventually
+  - Eventually == does not imply a time bound, but if you let the system run long enough, then...
+- Example in Real World
+  - Guarantee that "at least one of the athletes in the 100 m final will win gold" is liveness
+  - A criminal will eventually be jailed
+- Examples in Distributed System
+  - Distributed computation: Guarantee that it will terminate
+  - "Completeness" in failure detectors: every failure is eventually detected by some non-faulty process
+  - In Consensus: All Processes eventually decide on a value
+
+#### Safety
+
+- Safety = guarantee that something bad will never happen
+- Example in Real World
+  - A peace treaty between two nations provides safety
+    - War will never happen
+  - An innocent person will never be jailed
+- Examples in a Distributed System
+  - There is no deadlock in a distributed transaction system
+  - No object is orphaned in a distributed object system
+  - "Accuracy" in failure detectors
+  - In Consensus : No two processes decide on different values
+
+#### Can't We Guarantee Both
+
+- ***Can be difficult to satisfy both liveness and safety in an asynchronous distributed system!***
+  - Failure Detector: Completeness(Liveness) and Accuracy(Safety) cannot both be guaranteed by a failure detector in an asynchronous distributed system
+  - Consensus : Decisions(Liveness) and correct decisions(Safety) cannot both be guaranteed by any consensus protocol in an asynchronous distributed system
+  - Very difficult for legal systems(anywhere in the world) to guarante that all criminal are jailed(liveness) and no innocents are jailed(Safety)
+
+#### In The Language Of Global States
+
+- Recall that a distributed systems moves from one global state to another global state, via causal steps
+- Liveness w.r.t.(With Respect To) a property Pr in a given state S means
+  - S satisfies Pr, or there is some causal path of global states from S to S' where S' satisfies Pr
+- Safety w.r.t a property Pr in a given state S means
+  - S satisfies Pr, and all global states S' reachable from S also satisfy Pr
+
+#### Using Global Snapshot Algorithm
+
+- Chandy-Lamport algorithm can be used to detect global properties that are stable
+  - Stable = once true, stays true forever afterwards
+- Stable Liveness examples
+  - Computation has terminated
+- Stable Non-Safety examples
+  - There is a deadlock
+  - An object is orphaned (No pointers point to it)
+- All stable global properties can be detected using the Chandy-Lamport algorithm 
+  - ***Due to its causal correctness***
+
+#### Summary
+
+- The ability to calculate global snapshots in a distributed system is very important
+- But don't want to interrupt running distributed application
+  - you want to calculate the snapshot concurrently and parallelly while allowing the application to continue proceeding and sending its application messages, and sending its application messages, and the Chandy-Lamport algorithm allows us to do exactly that.
+- Chandy-Lamport algorithm calculates global snapshot
+  - In other words, it satisfies a consistent cut, it is equivalent to a consistent cut, and it can be used to detect stable global properties which are either liveness properties or non-safety properties
+- Obeys causality (creates a consistent cut)
+- Can be used to detect stable global properties
+- Safety vs Liveness
