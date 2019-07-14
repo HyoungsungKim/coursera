@@ -260,3 +260,147 @@ In this lecture, we will see two very important properties that are desired in d
 - Obeys causality (creates a consistent cut)
 - Can be used to detect stable global properties
 - Safety vs Liveness
+
+## Lesson 2: Multicast
+
+### 2.1 Multicast Ordering
+
+#### Multicast Problem
+
+- Node with a piece of information to be communicated to everyone
+- Distributed Group of "Nodes" = Processes at Internet-based host
+
+#### Other Communication Forms
+
+- Multicast -> message sent to a group of processes
+- Broadcast -> message sent to all processes(anywhere)
+- Unicast -> message sent from one sender processes to one receiver process
+
+#### Who Uses Multicast?
+
+- A widely-used abstraction by almost all cloud systems
+- Storage systems like Cassandra or a database
+  - Replica servers for a key: write/read to the key are multicast within the replicas group
+  - All servers: membership information(e.g., heartbeats) is multicast across all servers in cluster
+- Online scoreboards(ESPN, French Open, FIFA Cup)
+  - Multicast to group of client interested in the scores
+- Stock Exchanges
+  - Group is the set of broker computers
+  - Groups of computers for High frequency Trading
+- Air traffic control system
+  - All controllers need to receive the same updates in the same order
+
+#### 1. FIFO Ordering
+
+- ***Multicast from each sender are received in the order they are sent, at all receivers***
+- Don't worry about multicast from different senders
+- More formally
+  - If a correct process issues(sends) multicast(g,m) to group g and then multicast(g,m'), then every correct process that deliver m' would already have delivered m.
+
+> 먼저 온게 먼저 나감
+
+#### 2. Causal Ordering
+
+- Multicasts whose send events are causally related, must be received in the same causality-obeying order at all receivers
+- Formally
+  - If multicast(g,m) -> multicast(g, m') then any correct process that delivers m' would already have delivered m.
+  - (-> is Lamport's happens-before)
+  - If two message sends, m and m', are not causally related, meaning that their send events do not have a causal path between them.
+  - all bets are off and ***it is not necessarily required that their multicasts be delivered in the same order***
+- In concurrent, messages can be received in different orders at different receivers
+
+#### Causal VS. FIFO
+
+- Causal Ordering -> FIFO Ordering
+- Why?
+  - If two multicasts M and M' are sent by the same process P, and M was sent before M', then M->M'
+  - Then a multicast protocol that implements causal ordering will obey FIFO ordering since M->M'
+- ***Reverse is not true!*** FIFO ordering does not imply causal ordering.
+
+>Causal -> FIFO (O)
+>
+>FIFO -> Causal (X)
+
+#### Why Causal At All?
+
+- group = set of your friends on a social network
+- A friend sees your message m, and she posts a response (comment) m' to it
+  - If friends receive m' before m, it wouldn't make sense
+  - But if two friends post messages m'' and n'' concurrently, then they can be seen in any order at receivers
+- A variety of systems implement causal ordering: Social networks bulletin boards, comments on websites, etc.
+
+#### 3. Total Ordering
+
+- Also known as "Atomic Broadcast"
+- Unlike FIFO and causal, ***this does not pay attention to order of multicast sending***
+- ***Ensures all receivers receive all multicasts in the same order***
+- Formally
+  - If a correct process P delivers message m before m' (independent of the senders), then any other correct process P' that delivers m' word already have delivered m.
+- Sometimes multicasts wait to ensure same order
+
+#### Hybrid Variants
+
+- ***Since FIFO/Causal are orthogonal to Total, can have hybrid ordering protocols too***
+  - FIFO-total hybrid protocol satisfies both FIFO and total orders
+  - Casual-total hybrid protocol satisfies both Causal and total orders
+
+### 2.2 Implementing Multicast Ordering 1
+
+#### Multicast Ordering
+
+- How do we implement each of the ordering schemes we've seen
+  - FIFO ordering (This lecture)
+  - Causal ordering (Next lecture)
+  - Total Ordering (This lecture)
+
+#### FIFO Multicast: Data Structures
+
+- Each receiver maintains a per-sender sequence number(integers)
+  - Processes P1 through PN
+  - Pi maintains a vector of sequence numbers Pi\[1...N] (initially all zeros)
+  - Pi[j] is the latest sequence number Pi has received from Pj
+
+#### FIFO Multicast: Updating Rules
+
+- Send multicast at process Pj:
+  - Set Pj[j] = Pj[j] + 1
+  - Include new Pj[j] in multicast message as its sequence number
+- Receive multicast: If Pi receives a multicast from Pj with sequence number S in message
+  - If(S == Pj[j] + 1) then
+    - deliver message to application
+    - Set Pi[j] = Pi[j] + 1
+    - ***Else buffer this multicast until above condition is true***
+- It may buffer a received multicast message until FIFO ordering is satisfied
+
+#### Total Ordering
+
+- ***Ensure all receivers receive all multicasts in the same order***
+- Formally
+  - If a correct process P delivers message m before m'(independent of the senders), then any other correct process P' that delivers m' would already m have delivered ,
+
+#### Sequencer-Based Approach
+
+- Special process elected as leader or sequencer
+
+- Send multicast at process Pi:
+
+  - Send multicast message M to group and sequencer
+
+- Sequencer:
+
+  - Maintains a global sequence number S (initially 0)
+  - When it receives a multicast message M, it sets S = S + 1, and multicasts<M, S>
+
+- Receive multicast at process Pi:
+
+  - Pi maintains a local received global sequence number Si (initially 0)
+
+  - If Pi receives a multicast M from Pj, it buffers it until it both 
+
+    1. Pi receives<M, S(M)> from sequencer, and
+    2. Si + 1 == S(M)
+
+    - Then deliver it message to application and set Si = Si + 1
+    - In other words, it has to wait until S(M) value in the message from the sequencer is one more than the global sequence number Si that Pi is waiting for.
+    - 로컬 시퀸스가 글로벌 시퀸스보다 1 커질때 까지 기다려야 함.
+    - So this ensures that in fact the multicast message that Pi delivers next is in fact the next one that Pi is waiting for.
