@@ -404,3 +404,86 @@ In this lecture, we will see two very important properties that are desired in d
     - In other words, it has to wait until S(M) value in the message from the sequencer is one more than the global sequence number Si that Pi is waiting for.
     - 로컬 시퀸스가 글로벌 시퀸스보다 1 커질때 까지 기다려야 함.
     - So this ensures that in fact the multicast message that Pi delivers next is in fact the next one that Pi is waiting for.
+
+### 2.3 Implementing Multicast Ordering 2
+
+#### Causal Ordering
+
+- Multicasts whose send events are causally related, must be received in the same causality-obeying order at all receivers
+- Formally
+  - if multicast(g, m) -> multicast(g, m') then any correct process that delivers m' would already have delivered m.
+  - (-> is Lamport's happens before)
+
+#### Causal Multicast: Data structures
+
+- Each receiver maintains a vector of per-sender sequence numbers(integers)
+  - Similar to FIFO Multicast, but updating rules are different
+  - Process P1 through PN
+  - Pi maintains a vector Pi[1...N] (initially all zeros)
+  - Pi[j] is the latest sequence number Pi has received from Pj
+
+#### Causal Multicast: updating Rules
+
+- Send Multicast at process Pj:
+  - Set Pj[j] = Pj[j] + 1
+  - Include new entire vector Pj[1..N] in multicast message as its sequence number
+- Receive multicast: If Pi receives a multicast from Pj with vector M\[1...N](=Pj[1...N]) in message, buffer it until both:
+  1. This message is the next one Pi is expecting from Pj, i.e.,
+     - M[j] = Pi[j] + 1
+  2. All multicasts, anywhere in the group, which happened-before M have been received at Pi, i.e.,
+     - For all k != j : M[k] <= Pi[k]
+     - i.e., Receiver satisfies causality
+  3. When above two conditions satisfied, deliver M to application and set Pi[j] = M[j]
+
+#### Summary: Multicast Ordering
+
+- Important because ***Ordering of multicasts affect correctness of distributed systems using multicasts***
+- Three popular ways of implementing ordering
+  - FIFO, Causal, Total
+- And their implementations
+- What about reliability of multicasts?
+- What about failures?
+
+### 2.4 Reliable Multicast
+
+#### Reliable Multicast
+
+- Reliable multicast loosely says that every process in the group receives all multicasts
+  - Reliability is orthogonal to ordering
+  - Can implement Reliable-FIFO, or Reliable-Causal, or Reliable-Total, or Reliable-Hybrid protocols
+- What about process failures?
+  - When you have process failures, you don't necessarily know what the failed or the faulty processes did the definition becomes a little bit vague
+- Definition becomes vague
+
+#### Reliable Multicast(Under Failures)
+
+- Need all correct(i.e., non-faulty) processes to receive the same set of multicasts as all other correct processes
+  - Faulty processes are unpredictable, so we will not worry about them
+  - We were seeing is that is a single run of the system at the end of the run when you have a small set of correct processes, which did not fall.
+  - the set of multicasts received at any one of those processes in that small set is the same as the set of multicasts received at any other process in that same set.
+  - Reliable multicast sends that all the multicasts that are sent to the group are either received at all the processes that are correct or none of the processes that are correct
+    - That is what reliability really means
+
+#### Implementing Reliable Multicast
+
+- Let's assume we have reliable unicast(e.g., TCP) available to us
+- First-cut: Sender process (of each multicast M) sequentially sends a reliable unicast message to all group recipients
+- First-cut protocol does not satisfy reliability
+  - ***If sender fails, some correct processes might receive multicast M, while other correct processes might not receive M*** -> not real implementation
+
+#### Really Implementing Reliable Multicast
+
+- Trick : Have receivers help the sender
+
+1. Sender process (of each multicast M) sequentially sends a reliable unicast message to all group recipients
+2. When a receiver receives multicast M, It also sequentially sends M to all the group's processes
+
+#### Analysis
+
+- Not the most efficient multicast protocol, but reliable
+- Proof is by contradiction
+- Assumption two correct processes Pi and Pj are so that Pi received a multicast M and Pj did not receive that multicast M
+  - Then Pi would have sequentially sent the multicast M to all group members, including Pj, and Pj would have received M
+  - A contradiction
+  - Hence our initial assumption must be false
+  - Hence protocol preserves reliability
