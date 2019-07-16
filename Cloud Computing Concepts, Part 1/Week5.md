@@ -487,3 +487,225 @@ In this lecture, we will see two very important properties that are desired in d
   - A contradiction
   - Hence our initial assumption must be false
   - Hence protocol preserves reliability
+
+### 2.5 Virtual Synchrony
+
+#### Virtual Synchrony or View Synchrony
+
+- ***Attempts to preserve multicast ordering and reliability in spite of failures***
+- Combines a membership protocol with a multicast protocol
+- Systems that implemented in(like Isis) have been used in NYSE, French Air Traffic Control System, Swiss Stock Exchange
+
+#### Views
+
+> Process가 가지고 있는 membership list를 view라고 함.
+
+- ***Each process maintains a membership list***
+- The membership list is called ***View***
+- An update to the membership list is called a ***View Change***
+  - Process join, leave, or failure
+- Virtual synchrony guarantee that ***all view changes are delivered in the same order at all correct processes***
+  - If a correct P1 process receives views, say {P1}, {P1, P2, P3}, {P1, P2}, {P1, P2, P4} then
+  - ***Any other correct process receives the same sequence of view changes(after it joins the group)***
+    - P2 receives views{P1, P2, P3}, {P1, P2}, {P1, P2, P4}
+- Views may be delivered at different physical times at processes, ***but they are delivered in the same order***
+
+#### VSync Multicasts
+
+- A multicast M is said to be "delivered in a view V at process Pi" if
+  - Pi receives view V, and then sometime before Pi receives the next view it delivers multicast M
+- Virtual synchrony ensures that
+  1. The set of multicasts delivered in a given view is the same set at all correct processes that were in that view
+     - What happens in a View, stays in that View
+  2. The sender of the multicast message also belongs to that view
+  3. If a process Pi does not deliver a multicast M in view V while other processes in the view V delivered M in V, then Pi will be forcibly removed from the next view delivered after V at the other processes
+     - So you have to go with what he rest of the group is doing otherwise you might be forcibly removed from that group if you don't satisfy group
+
+> View 전달 받고 받은 view 다른 process에 전달 안하면 탈락 됨
+
+#### What about Multicast Ordering?
+
+- Again, orthogonal to virtual synchrony
+- The set of multicasts delivered in a view can be ordered either
+  - FIFO
+  - Or Causally
+  - Or Totally
+  - Or using a hybrid scheme
+
+#### About That Name
+
+- Called "virtual synchrony" since in spite of running on an asynchronous network, it gives the appearance of a synchronous network underneath that obeys the same ordering at all processes
+- So can this virtually synchronous system be used to implement consensus?
+- No! VSync groups susceptible to partitioning
+  - E.g., This may happen due to inaccurate failure detections because a process may be mistakenly detected they will be removed from the group
+
+#### Summary
+
+- Multicast an important building block for cloud computing systems
+- Depending on application need, can implement
+  - Ordering
+  - Reliability
+  - Virtual synchrony 
+- If you need something really strong  then you can implement virtual synchrony or real synchrony
+
+## Lesson 3: Paxos
+
+### 3.1 The Consensus Problem
+
+#### Give it Thought
+
+- Have you ever wondered why distributed server vendors always only offer solutions that promise five-9's reliability, seven-9's reliability, but never 100% reliable?
+- The fault does not lie with the companies themselves, or the worthlessness of humanity
+- The fault lies in the impossibility of consensus
+
+#### What is common to all of these
+
+- A group of servers attempting:
+  - Make sure that all of them receive the same updates in the same order as each other[Reliable Multicast]
+  - ***To keep their own local lists*** where they know about each other, and when anyone leaves or fails, ***everyone is updated simultaneously*** [Membership/Failure Detection]
+  - Elect a leader among them, and let everyone in the group know about it [Leader Election]
+  - To ensure mutually exclusive(one process at a time only) access to a critical resource like a file
+    - critical section에 한번에 하나의 프로세스만 접근 가능해야 함[Mutual Exclusion]
+
+#### So What is Common?
+
+- Let's call each server a "process" (think of the daemon at each server)
+- All of these were groups of processes attempting to coordinate with each other and reach agreement on the value of something
+  - The ordering of message
+  - The up/down status of a suspected failed process
+  - Who the leader is
+  - Who has access to the critical resource
+- ***All of these are related to the Consensus problem***
+
+#### What is Consensus?
+
+Formal problem statement
+
+- N process
+- Each process p has
+  - input variable xp : initially either 0 or 1
+  - output variable yp : initially b (can be changed only once)
+- Consensus problem : design a protocol so that at the end, either
+  1. All processes set their output variable to 0 (all-0's)
+  2. Or All processes set their output variables to 1 (all-1's)
+
+#### What is Consensus?(2)
+
+- Every process contributes a value
+- ***Goal is to have all processes decide same (some) value***
+  - Decision once made can't be changed
+- There might be other constraints
+  - Validity = If everyone proposes same value, then that's what is decided
+  - Integrity = decided value must have been proposed by some process
+  - Non-triviality = There is at least one initial system state that leads to each of the all-0's or all-1's outcomes
+
+#### Why is it important?
+
+- Many problems in distributed systems are equivalent to (or harder than) consensus!
+  - Perfect Failure Detection
+  - Leader election (select exactly one leader, and every alive process know about it)
+  - Agreement (harder than consensus)
+- So consensus is a very important problem, and solving it would be really useful!
+- So, is there a solution to Consensus
+
+#### Two Different Models of Distributed Systems
+
+- Synchronous System Model and Asynchronous System Model
+
+- ***Synchronous Distributed System***
+
+  - Each message is received within bounded time(bound is global bound)
+  - Drift of each process' local clock has a known bound
+  - Each step in process takes lb(lower bound) < time < ub(upper bound)
+    - Each process has a minimum speed and also a maximum, speed at which it executes instructions
+
+  e.g. A collection of processors connected by a communication bus(share a communication bus and are on the same motherboard), e.g., a Cray supercomputer or a multi-core machine
+
+- ***Asynchronous Distributed System***
+
+  - No bounds on process execution
+  - The drift rate of a clock is arbitrary
+  - No bounds on message transmission delays
+
+  e.g., The Internet is an asynchronous distributed system, so are ad-hoc and sensor networks
+
+- This is a more general(and thus challenging) model than the synchronous system model. A protocol for an asynchronous system will also work for a synchronous system (but not vice-versa)
+
+#### Possible or Not
+
+- In the synchronous system model
+  - Consensus is solvable
+- In the asynchronous system model
+  - ***Consensus is impossible to solve***
+  - Whatever protocol/algorithm you suggest, there is always a worst-case possible execution(with failures and message delays) that prevents the system from reaching consensus
+  - Powerful result(see the FLP proof in the Optional lecture of this series)
+  - Subsequently, safe or probabilistic solutions have become quite popular to consensus or related problems
+
+### 3.2 Consensus in Synchronous Systems
+
+#### Let's Try to Solve Consensus!
+
+- What is the system model?
+
+- Synchronous system : bounds on
+
+  - Message delays
+
+  - Upper bound on clock drift rates
+
+  - Max time for each process step
+
+    e.g., multiprocessor (common clock across processors)
+
+- Processes can fail by stopping(crash-stop or crash failures)
+
+#### Consensus In Synchronous Systems
+
+- For a system with at most f processes crashing(f is the maximum number of processes that crash)
+  - All processes are synchronized and operate in "rounds" of time
+  - The rounds are essentially demarcated by specific times at which processes finish a round and start the next round.
+  - The algorithm proceeds in f + 1 rounds (with timeout), using reliable communication to all members
+  - $Value^r_i$ the set of proposed values known to pi at the beginning of round r.
+
+#### Consensus in Synchronous System
+
+- Initially $Values^0_i$ = {}; $Values^1_i = {v_i}$
+
+  ```\
+  for round = 1 to f + 1 do
+  	multicast($Values^r_i -Values^{r-1}_i$) 
+  	$Values^{r+1}_i$ <- $Values^r_i$
+  	
+  	//Since this is a synchronous system,
+  	//if the sending process and the receiving process are both non-faulty,
+      //this message will be received before the end of the round.
+      //If any one of them is faulty, then the message may not be received.
+      
+  	for each Vj received
+  		$Values^{r+1}_i = Values^{r+1}_i$ ∪ Vj
+  	end
+  end
+  
+  di = minimum($Value^{f+1}_i$)
+  ```
+
+- This protocol ensures that all the non-faulty processes in the group, the ones that have not crashed, end up with the identical values arrays at the end of the f + 1 rounds.
+
+- so that when they take this minimum operation, they all end up with the same decision value
+
+- At the end, you simply look at your values array, all the values that you have received, and you can look at the minimum value that you have received.
+
+  - This could either be the minimum Id process who has sent you a value, or 
+  - it could just be the minimum value that you have received, and you set your decision variable or your output variable to be that minimum value.
+
+#### Why Does The Algorithm Work?
+
+- After f + 1 rounds, all non-faulty processes would have received the same set of Values. Proof by contradiction.
+- Assume that two non-faulty processes, say pi and pj, differ in their final set of values(i.e., after f + 1 rounds)
+- Assume that pi possesses a value v that pj does not possess.
+  - pi must have received v in the very last round
+    - Else, pj would have sent v to pj in that last round
+  - So in the last roundL a third process, pk must have sent v to pi, but then crashed before sending v to pj
+  - Similarly, a fourth process sending v in the last-but-one round must have crashed; otherwise, both pk and pj should have received v.
+  - Proceeding in this way, we infer at least one(unique) crash in each of the preceding rounds
+  - This means a total of f+1 crashed, while we have assumed at most f crashes can occur => contradiction
