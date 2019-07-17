@@ -705,7 +705,161 @@ Formal problem statement
 - Assume that pi possesses a value v that pj does not possess.
   - pi must have received v in the very last round
     - Else, pj would have sent v to pj in that last round
-  - So in the last roundL a third process, pk must have sent v to pi, but then crashed before sending v to pj
+  - So in the last round: a third process, pk must have sent v to pi, but then crashed before sending v to pj
   - Similarly, a fourth process sending v in the last-but-one round must have crashed; otherwise, both pk and pj should have received v.
   - Proceeding in this way, we infer at least one(unique) crash in each of the preceding rounds
   - This means a total of f+1 crashed, while we have assumed at most f crashes can occur => contradiction
+
+### 3.3. Paxos, Simply
+
+One of the most popular solutions of the consensus problem in the Asynchronous Distributed System Model is Paxos.
+
+#### Consensus Problem
+
+- Consensus impossible to solve in asynchronous system(FLP Proof FLP : 3명의 사람 이름 첫 글자)
+  - key to the Proof : It is impossible to distinguish a failed process from one that is just very very (very) slow.
+  - Hence the rest of the alive processes may stay ambivalent(forever) when it comes to deciding
+- But Consensus important since it maps to many important distributed computing problems
+- Um... Can not we just solve consensus?
+
+> ambivalent : 반대 감정이 병존하는
+
+#### Yes We Can!
+
+- Paxos algorithm
+  - Most popular "consensus-solving" algorithm
+  - Does not solve consensus problem(which would be impossible, because we already proved that)
+  - But provides safety and eventual liveness
+  - A lot of system use it
+    - Zookeeper(Yahoo!), Google chubby, and many other companies
+- Paxos invented by Leslie Lamport
+- Paxos provides safety and eventual liveness
+  - Safety: Consensus is not violated
+  - Eventual Liveness: If things go well sometimes in the future(message, failures, etc), there is a good chance consensus will be reached. But there is no guarantee
+- FLP result still applies: Paxos is not guaranteed to reach Consensus(ever, or within any bounded time)
+- There is no guarantee that liveness will actually be achieved within a time-bound, or even within our lifetime. The guarantee is only eventual. ***However, implementations of paxos often reach consensus fairly quickly.***
+- ***Paxos is not guarantee to reach consensus ever, or within a time-bound***(FLP proved perfect consensus is impossible)
+
+#### Political Science 101, I.E., Paxos Groked
+
+- Paxos has rounds : each round has a unique ballot(미기명 투표, 투표용지) id
+- Rounds are asynchronous
+  - Time synchronization not required
+  - ***If you are in round j and hear a message from round j + 1, about everything and move over to round j + 1*** -> Completely asynchronous
+  - Use timeouts; may be pessimistic(비관적인)
+- ***Each round*** itself broken into phases (which are also asynchronous)
+  - Phase 1 : A leader is elected (Election)
+  - Phase 2 : Leader proposes a value, processes ack (Bill)
+  - Phase 3 : Leader multicasts final value (Law)
+
+#### Phase 1 - Election
+
+- Potential leader choose a unique ballot id, higher than seen anything so far
+- There might be multiple potential leaders in, who are trying to become the actual leader in the group
+- Sends to all processes
+- Processes wait, respond once to highest ballot id
+  - If potential leader sees a higher ballot id, it cannot be a leader
+    - If the potential leader sees a higher ballot ID, potential leader refuse to be the leader
+  - paxos tolerant to multiple leaders, but we will only discuss 1 leader case
+  - Processes also log received ballot ID on disk
+    - This is important because if processes crash, and then recover, they can look at the log and then start where they left off
+- If a process has in a previous round decided on a value v', it includes value v' in its response
+- If majority (i.e., quorum) respond Ok then you are the leader
+  - ***If no one has majority, start new round***
+- (If things go right) A round cannot have two leaders(why? Process cannot vote many time)
+
+#### Phase 2 - Proposal (Bill)
+
+- Leader sends proposed value v to all
+  - use v == v' if some process already decided in a previous round and sent you its decided value v'
+- Recipient logs on disk; responds OK
+
+#### Phase 3 - Decision (Law)
+
+- If leader hears a majority of OKs, it lets everyone know of the decision
+- Recipient receive decision, log in on disk
+
+#### Which is the point of No-return?
+
+- That is, when is consensus reached in the system
+- If/when a majority of processes hear proposed value and accept it(i.e., are about to/have respond(ed) with an OK!)
+- Processes may not know it yet, but a decision has been made for the group
+  - Even leader does not know it yet
+- What if leader fails after that?
+  - Keep having rounds until some round completes
+
+#### Safety
+
+- Why does this algorithm guarantee safety?
+- If some round has a majority (i.e., quorum) hearing proposed value v' and accepting it (middle of Phase 2), then subsequently at each round either:
+  1. The round choose v' as decision
+  2. the round fails
+- Proof:
+  - Potential leader waits for majority of OKs in Phase 1
+  - At least one will contain v' (because two majorities or quorums always intersect)
+  - it will choose to send out v' in Phase 2
+- Success requires a majority, and any two majority sets intersect
+
+#### What Cloud Go Wrong
+
+There is only eventually liveness. If there are not too many failures, and if messages are not delayed just the wrong time then there is a good chance that the Paxos protocol, some round of the paxos might actually end up with a decision being a maid, and the Law phase succeeding at all the processes
+
+A lot of things cloud go wrong that could prevent rounds from succeeding, and these need actions to be taken by the paxos protocol so that it is still trying to reach liveness.
+
+- Process fails
+  - Majority does not include it
+  - When process restarts, it uses log to retrieve a past decision (if any) and past-seen ballot ids. Tries to know of past decision
+- Leader fails
+  - Start another round
+- Messages dropped
+  - If too flaky(괴짜인), just start another round
+- Note that anyone can start a round any time
+- Protocol may never end - tough luck, buddy!
+  - Impossibility result not violated
+  - If things go well sometime in the future, consensus reached
+- A lot more!
+- This is a highly simplified view of Paxos
+
+#### Summary
+
+- Consensus is a very important problem
+  - Equivalent to many important distributed computing problems that have to d with reliability
+- Consensus is possible to solve in a synchronous system where message delays and processing delays are bounded
+- Consensus is impossible to solve in an asynchronous system where these delays are unbounded
+- Paxos protocol : widely used implementation of a safe eventually-live consensus protocol for asynchronous systems
+  - Paxos(or variants) used in Apache Zookeeper, Google's chubby system, Active Disk Paxos, and many other cloud computing systems.
+
+### 3.4 The FLP Proof
+
+#### Consensus In an Asynchronous System
+
+- Impossible to achieve
+- Proved in a now-famous result by Fischer, Lynch and Patterson, 1983(FLP)
+  - Stopped many distributed system designers dead in their tracks
+  - A lot of claims of "reliability" vanished overnight
+
+#### Recall
+
+Asynchronous system : All message delays and processing delays can be arbitrarily long or short
+
+Consensus:
+
+- Each process p has a state
+  - Program counter, register, stack, local variables
+  - input register xp : initially either 0 or 1
+  - output register yp : initially b (undecided)
+- Consensus Problem : design a protocol so that either
+  - All processes set their output variable to 0 (all-0's)
+  - Or all processes set their output variables to 1 (all-1's)
+  - Non-triviality : at least one initial system state leads to each of the above two outcomes
+
+#### Proof Setup
+
+- For impossibility proof, OK to consider
+  1. more restrictive system model, and
+  2. easier problem
+     - Why is this is ok?
+
+#### Network
+
+p -> Global Message Buffer(Network) -> p'
