@@ -863,3 +863,77 @@ Consensus:
 #### Network
 
 p -> Global Message Buffer(Network) -> p'
+
+#### States
+
+- States of a process
+- Configuration = global state. Collection of states, one for each process; alongside state of the global buffer.
+- Each Event (different from Lamport events)
+  - receipt of a message by a process (say p)
+  - processing of message (may change recipient's state)
+  - sending out of all necessary messages by p
+- Schedule : sequence of events
+
+#### Easier Consensus Problem
+
+- Easier Consensus Problem : some process eventually sets yp to be 0 or 1
+- Only one process crashes - We are free to choose which one
+- Let config. C have a set of decision calues V reasonalbe from it
+  - If |V| = 2, config, C is bivalent
+  - If |V| = 1, config. C is 0-valuent or 1-valent, as is the case
+- ***Bivalent means outcome is unpredictable.***
+
+#### What The FLP Proof Shows
+
+1. There exists an initial configuration that is bivalent
+2. Starting from a bivalent config. There is always another bivalent config. That is rechable
+
+####  Lemma 2 - Some initial configuration is bivalent
+
+- Suppose all initial configurations were either 0-valent or 1-valent.
+- If there are N processes, there are 2^N possible initial configurations
+- Place all configurations side-by-side (in a lattice), where adjacent configurations differ in initial xp value for exactly one process.
+- There has to be some adjacent pair of 1-valent and 0-valent config
+
+Let's prove it by contradiction - There exists an initial configuration that is bivalent
+
+- There has to be some adjacent pair of 1-valent and 0-valent configs.
+- Let the process p, that has a different state across these two configs. be the process that has crashed (i.e., is silent throughout)
+  - Both initial configs. will lead to the same config. for the same sequence of events
+  - Therefore, both these initial configs. are bivalent when there is such a failure
+
+#### Lemma 3 - Starting from a bivalent config., there is always another bivalent config. that is rechable
+
+- A bivalent initial config.
+- Let e = (p, m) be some event applicable to the initial config.
+- Let C be the set of configs. reachable without applying e
+- Let D be the set of configs obtained by applying e to some config. in C
+
+Claim. Set D contains a bivalent config
+
+Proof. By contradiction. That is suppose D has only 0- and 1- valent states(and no bivalent ones)
+
+- There are states D0 and D1 in D, and C0 and C1 in C such that
+  - D0 is 0-valent, D1 is 1-valent
+  - D0 = C0 foll. by e=(p,m)
+  - D1 = C1 foll. by e = (p, m)
+  - And C1 = C0 followed by some event e' = (p',m') - why?
+- Case 1 : p' is not p
+- Case 2 : p' is same as p
+
+#### Putting It All Together
+
+- Lemma 2 : There exists an initial configuration that is bivalent
+- lemma 3 : Starting from a bivalent config., there is always another bivalent config. That is reachable
+- Theorem(Impossibility of Consensus): There is always a run of events in an asynchronous distributed system such that the group of processes never reach consensus (i.e., stays bivalent all the time)
+
+#### Summary
+
+- Consensus Problem
+  - Agreement in distributed systems
+  - Solution exists in synchronous system model(e.g., super computer)
+  - Impossible to solve in an asynchronous system(e.g., Internet, Web)
+    - Key idea : with even one(adversarial) crash-stop process failure, there are always sequences of events fro the system to decide any which way
+    - holds true regardless of whatever algorithm you choose!
+  - FLP impossibility proof
+- One of the most fundamental result in distributed systems
