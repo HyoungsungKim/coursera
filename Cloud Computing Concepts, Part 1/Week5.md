@@ -169,7 +169,7 @@ Consistent cut shown by this green dotted line is in face the same as the state 
 
 #### In fact...
 
-- Any run of the Chandy-Lamport Global Snapshot algorithm creates a consistent cut
+- ***Any run of the Chandy-Lamport Global Snapshot algorithm creates a consistent cut***
 
 #### Chandy-Lamport Global Snapshot Algorithm Creates A Consistent Cut
 
