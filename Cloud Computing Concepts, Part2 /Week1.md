@@ -158,4 +158,4 @@
 - if we could solve election, then we could solve consensus!
   - Elect a process, use its id's last bit as the consensus decision
 - But since consensus is impossible in asynchronous systems, so is election!
-- Next lecture: Can;t we use Paxos?
+- Next lecture: Can't we use Paxos?

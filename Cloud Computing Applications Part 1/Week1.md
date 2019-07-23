@@ -48,3 +48,46 @@ How the services of the clouds get delivered to the customer
   - ***Easy to write programs, fast turn around***
   - MapReduce - Hadoop, PIG, HDFS, HBase
 
+### 1.1.3 Cloudnomics: Part1
+
+#### Cloudnomics: Part1
+
+Economics necessitates Cloud Computing:
+
+- Part 1: utility Pricing
+- Part 2: Benefits Common Infrastructure
+
+#### Value of Utility Pricing
+
+- Cloud services don't need to be cheaper to be economic!
+- Consider a car
+  - Buy or lease for $10 per day
+  - Rent a car for $45 a day
+  - if you need a car for 2 days in a trip, buying would be much more costly than renting
+  - ***It depends on the demand***
+
+#### Utility Pricing in real World
+
+- In Practice demands are often highly spiky
+  - News stories, marketing promotions, product launches, Internet flash floods (Slashdot effect), tax season, Christmas shopping, etc.
+- Often a hybrid model is the best
+  - You own a car for daily commute, and rent a car when traveling or when you need a van to move
+  - But we should also consider other costs
+    - network cost (both fixed costs and usage costs)
+    - Interoperability overhead
+    - Consider Reliability, accessibility
+
+### 1.1.5 Big Data
+
+#### Big Data(A singular phrase!)
+
+- A collection of data sets so large and complex, it's impossible to process it on one computer with the usual database and tools
+- Because of its its and complexity, Big Data is hard to capture, store, copy, delete(privacy), search, share, analyze and visualize
+
+Big Data represents the information assets characterized by such a High
+
+- Volume,
+- Velocity and
+- Variety
+
+to require specific Technology and Analytical Methods for its transformation into Value
