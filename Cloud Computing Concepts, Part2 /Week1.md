@@ -159,3 +159,153 @@
   - Elect a process, use its id's last bit as the consensus decision
 - But since consensus is impossible in asynchronous systems, so is election!
 - Next lecture: Can't we use Paxos?
+
+### 1.3 Election in Chubby and Zookeeper
+
+#### Can use Consensus To Solve Election
+
+- One approach
+  - Each process proposes a value
+  - Everyone in group reaches consensus on some process Pi's value
+  - That lucky Pi is the new leader!
+
+#### Election in Industry
+
+- Several system in industry use paxos-lie approaches for election
+  - Paxos is a consensus protocol (safe, but eventually live) : eleswhere in this course
+- Google's Chubby system
+- Apache Zookeeper
+
+#### Election in Google Chubby
+
+- A system for locking
+- essential part of Google's stack
+  - Many of Google's internal systems rely on Chubby
+  - BigTable, Megastore, etc
+- Group of replicas
+  - Need to have a master server elected at all times
+- Election protocol
+  - Potential leader tries to get votes from other servers
+  - Each server votes for at most one leader
+  - Server with majority of votes becomes new leader, informs everyone
+
+Why safe?
+
+- Essentially, each potential leader tries to reach a quorum(should sound familiar!)
+- Since any two quorums intersect, and each server votes at most once, cannot have two leaders elected simultaneously
+
+Why live?
+
+- Only eventually live! Failures may keep happening so that no leader is ever elected
+- In practice: elections take a few seconds worst-case noticed by Google : 30s
+
+#### Election in Google Chubby(2)
+
+- After election finishes, other servers promise not to run election again for "a while"
+  - "While" = time duration ***called "Master lease"***
+  - Set to a few seconds
+- Master lease can be renewed by the master as long as it continues to win a majority each time
+- Lease technique ensures automatic reelection on master failure
+
+> Master lease 시간 동안 leader election 하지 않음
+>
+> Master가 다시 master가 되면 master lease 갱신 됨
+
+#### Election in Zookeeper
+
+- Centralized service for maintaining configuration information
+- Uses a variant of Paxos called Zab(Zookeeper Atomic Broadcast)
+- Needs to keep a leader elected at all times
+- Each server creates a new sequence number for itself
+  - Let's say the sequence numbers are ids
+  - Gets highest id so far(from ZK file system), creates new-higher id, writes it into ZK files system
+- Elect the highest-id server as leader
+
+Failure:
+
+- One option: everyone monitors current master(directly or via a failure detector)
+  - When there is a failure detected, initiate a new election
+  - However, when the master fails, multiple other processes in the group might initiate elections simultaneously and this may lead to a flood of messages. - Leads to a flood of elections
+  - Too many messages
+
+- Second option(implemented in Zookeeper)
+  - ***Each process monitors its next-higher id process***
+  - IF that successor was the leader and it has failed
+    - Become the new leader
+  - ELSE
+    - wait for a timeout, and check your successor again
+  - What about id conflicts? What if leader fails during election?
+  - To address this, Zookeeper uses a two-phase commit (run after the sequence/id) protocol to commit the leader
+    - Leader sends NEW_LEADER message to all
+    - Each process responds with ACK to at most one leader, i.e., one with highest process id
+    - Leader waits for a majority of ACKs and then sends COMMIT to all
+    - On receiving COMMIT, process updates its leader variable
+  - No one has a 50% or more of the ACKs in the group. -> Fail
+  - And so liveness is not guaranteed here, you may need to read on the lead election protocol again
+  - Ensures that safety is still maintained, because of the use of quorums.
+
+### 1.4 Bully Algorithm
+
+#### Bully Algorithm
+
+- All processes know other process' ids When a process finds the coordinator has failed(via the failure detector):
+  - If it knows its id is the highest, it elects itself as coordinator, then sends a Coordinator message to all processes with lower identifiers. Election is completed
+  - Else if you know that you are not the next highest id process in the system, then you cannot be the bully
+    - it initiates an election by sending an election message
+    - Whom you send an election message to?
+      - You send election messages to only those processes that have a higher id than yourself
+    - ***If receives no answer within timeout, calls itself leader and sends Coordinator message to all lower id processes, Election completed***
+    - ***If an answer received however, then there is some non-faulty higher process => so, wait for coordinator message, If none received after another timeout, start a new election run***
+  - A process that received an Election message replies with OK message within time, and start its own leader election process(unless it has already done so)
+- If the bully has crashed, the highest-id process and that you are the next highest id process, then you become the new bully and you tell everyone else with a lower id that in fact you are the new leader and the new bully in the system
+
+#### Failure and Timeouts
+
+- If failures stop, eventually will elect a leader
+- How do you set the timeouts
+- Based on Worst-case time to complete election
+  - 5 message transmission times if there are no failures during the run:
+    - Election from lowest id server in group
+    - Answer to lowest id server from 2nd highest id process
+    - Election from 2nd highest id server to highest id
+    - Timeout for answer @ 2nd highest id server
+    - Coordinator from 2nd highest id server
+
+#### Analysis
+
+- Worst-case completion time : 5 message transmission times 
+
+  - When the process with the lowest id in the system detects the failure
+
+    - (N-1) process altogether begin elections, each sending messages to processes with higher ids.
+    - i-th highest id process sends(i - l) election messages
+
+  - number of Election messages
+
+    = N-1 + N-2 + ...+N - (N-1) = (N-1)*N/2 = O(N^2)
+
+    >모든 process의 응답을 기다려야 함
+
+- Best-case
+
+  - Second-highest id detects leader failure
+  - Sends (N-2) Coordinator messages
+  - Completion time : 1 message transmission time
+
+  > 1개의 process 응답만 기다리면 됨
+
+#### Impossibility
+
+- Since timeouts built into protocol, in asynchronous system model:
+  - protocol may never terminate => Liveness not guaranteed
+- But satisfied liveness in synchronous system model where
+  - Worst-case one-way latency can be calculated = worst-case process time + worst-case message latency
+
+#### Summary
+
+- Leader election an important component of many cloud computing systems
+- Classical leader election protocols
+  - Ring-based
+  - Bully
+- But failure-prone
+  - Paxos-like protocols used by Google Chubby, Apache Zookeeper
