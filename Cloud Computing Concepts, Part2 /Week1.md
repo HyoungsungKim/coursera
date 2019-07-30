@@ -309,3 +309,399 @@ Failure:
   - Bully
 - But failure-prone
   - Paxos-like protocols used by Google Chubby, Apache Zookeeper
+
+## Lesson 2: Mutual Exclusion
+
+### 2.1 Introduction and Basics
+
+#### Why Mutual Exclusion?
+
+- Bank's Service in the Cloud : Two of your customers make simultaneous deposit of $10,000 into your bank account, each from a separate ATM
+  - Both ATMs read initial amount of $1,000 concurrently from the bank's cloud server
+  - Both ATM s add $10,000 to this amount(locally at the ATM)
+  - Both write the final amount to the server
+  - What is wrong?
+    - You lost $10,000!
+- The ATMs need mutually exclusive access to your account entry at the server
+  - or, ***mutually exclusive*** access to executing the code that modifies the account entry
+
+#### More Uses of Mutual Exclusive
+
+- Distributed File system
+  - Locking of files and directories
+- Accessing objects in a safe and consistent way
+  - Ensure at most one server has access to object at any point of time
+- Server coordination
+  - Work partitioned across servers
+  - Servers coordinate using locks
+- In industry
+  - Chubby is Google's locking service
+  - Many cloud stacks use Apache Zookeeper for coordination among servers
+
+#### Problem Statement for Mutual Exclusion
+
+- Critical Section problem : Piece of code(at all processes) for which we need to ensure there is ***at most one process executing it at any point of time***
+- Each process can call three functions
+  - `enter()` to enter the critical section(CS)
+  - `AccessResource()` to run critical section code
+  - `exit()` to exit the critical section
+
+#### Approaches to Solve Mutual Exclusion
+
+- Single OS
+  -  If all processes are running in one OS a machine(or VM), then
+  - Semaphores, mutex, condition variables, monitors, etc
+- Distributed system:
+  - Processes communicating by passing messages
+- Need to guarantee 3 properties:
+  - Safety(essential) - At most one process executes in CS(Critical Section) at any time
+  - Liveness(essential)- Every request for a CS is granted eventually
+  - Ordering(desirable) - Requests are granted in the order they were made
+
+#### Processes Sharing an OS: Semaphores
+
+- Semaphore == an integer that can only be accessed via two special functions
+- Semaphore S = 1; // Max number of allowed accessors
+
+#### Next
+
+- In a distributed system, cannot share variables like semaphores
+- So how do we support mutual exclusion in a distributed system?
+
+### 2.2 Distributed Mutual Exclusion
+
+#### System Model
+
+- Before solving any problem, specify its System Model:
+  - Each pair of processes is connected by reliable channels(such as TCP)
+  - Messages are eventually delivered to recipient, and in FIFO(First In First Out) order.
+  - Processes do not fail
+    - Fault-tolerant variants exists in literature
+
+#### Central Solution
+
+- Elect a central master(or leader)
+
+  - Use one of our election algorithms!
+
+- Master keeps
+
+  - A queue of waiting requests from processes who wish to access the CS
+  - A special token which allows its holder to access CS
+
+- Actions of any process in group:
+
+  - `enter()`
+    - Send a request to master
+    - Wait for token from master
+  - `exit()`
+    - Send back token to master
+
+- Master Actions:
+
+  - On receiving a request from process Pi
+
+    ```pseudocode
+    if(master has token)
+    	Send token to Pi
+    else
+    	Add Pi to queue
+    ```
+
+  - On receiving a token from process Pi
+
+    ```pseudocode
+    if(queue is not empty)
+    	Dequeue head of queue (say Pj), send that process the token
+    else
+    	Retain token
+    ```
+
+#### Analysis of Central Algorithm
+
+- Safety - at most one process in CS
+  - Exactly one token
+- Liveness - every request for CS granted eventually
+  - With N processes in system, queue has at most N processes
+  - If each process exits CS eventually and no failures, liveness guaranteed
+- FIFO Ordering is guaranteed, in order of requests received at master
+
+#### Analyzing Performance
+
+There are two requirements from mutual exclusion algorithm
+
+- One is that they involve few messages, which means that they are incurring lower overhead on the network it self.
+- They incur low delays at the clients that access the critical section
+
+Efficient mutual exclusion algorithms use fewer messages, and make process wait for shorter durations to access resources. Three metrics:
+
+- `Bandwidth` : the total number of messages sent in each `enter` and `exit` operation
+  - 2 messages for enter
+  - 1 message for exit
+- `Client delay` : the delay incurred by a process at each enter and exit operation(when no other process is in, or waiting) - (We will prefer mostly the enter operation)
+  - 2 message latencies(request + grant)
+- `Synchronization delay` : the time interval between one process exiting the critical section and the next process entering it(when there is only one process waiting) 
+  - 2 message latencies(release + grant)
+
+#### But...
+
+- The master is the performance bottleneck and SPoF(single point of failure)
+
+#### Ring-Based Mutual exclusion
+
+- N processes organized in a virtual ring
+- Each process can send message to its successor in ring
+- Exactly 1 token
+- enter()
+  - Wait until you get toekn
+- exit()  //already have token
+  - Pass on token to ring successor
+- If receive token, and not currently in enter(). just pass on token to ring successor
+
+#### Analysis of Ring-Based Mutual Exclusion
+
+- Safety
+  - Exactly one token
+- Liveness
+  - Token eventually loops around ring and reaches requesting process (no failures)
+- bandwidth
+  - Per enter(), 1 message by requesting process but N Messages throughout system
+  - 1 message sent per exit()
+
+***What about performance?***
+
+- Client delay : 0 to N message transmissions after entering enter()
+  - Best case : already have token
+  - Worst case : just sent token to neighbor
+- Synchronization delay between one process' exit() from the CS and the next process' enter():
+  - Between 1 and (N - 1) message transmissions.
+  - Best case : process in enter() is successor of process in exit()
+  - Worst case : process in enter() is predecessor of process in exit()
+
+#### Next
+
+- Client/Synchronization delay to access CS still O(N) in Ring-Based approach
+- Can we lower this?
+
+### 2.3 Ricart-Agrawala's Algorithm
+
+#### System Model
+
+- Before solving any problem, specify its System Model:
+  - Each pair of processes is connected by reliable channels(such as TCP)
+  - Messages are eventually delivered to recipient, and in FIFO(First In First Out) order.
+  - Processes do not fail
+
+#### Ricart-Agawala's Algorithm
+
+- Classical algorithm from 1981
+- No token
+- Uses the notion of causality and multicast
+- Has lower waiting time to enter CS than Ring-Based approach
+
+#### Key Idea
+
+- enter() at process Pi
+  - Multicast a request to all processes
+    - Request : <T, Pi>, where T - current Lamport timestamp at Pi
+  - ***Wait until all other processes have responded positively to request***
+- Requests are granted in order of causality
+- Pi in request <T, Pi> is used to break ties (since Lamport timestamps are not unique for concurrent events)
+
+#### Messages in RA Algorithm
+
+- enter() at process Pi
+
+  - set state to `Wanted`
+  - multicast "`Request`" <Ti, Pi> to all processes, where Ti = current Lamport timestamp at Pi
+  - wait until all processes send back "`Reply`"
+  - change state to `Held` and enter the CS
+
+- On receipt of a Request <Tj, Pj> at Pi (i != j):
+
+  ```pseudocode
+  if(state == "Held") or(state == "Wanted" & (Ti,i) < (Tj,j))
+  //lexicographic ordering in (Ti, Pj)
+  add request to local queue (of waiting requests)
+  else send "Reply" to Pj
+  //먼저 대기중이었으면 Reply 안보냄
+  //모든 노드가 reply 보내면 CS 접근 가능 의미
+  ```
+
+- exit() at process Pi
+
+  - change state to `Released` and "`Reply`" to ***all*** queued request
+
+#### Analysis : Ricart-Agrawala's Algorithm
+
+- Safety
+  - Two processes Pi and Pj cannot both have access to CS
+    - If they did, then both would have sent Reply to each other
+    - Thus, (Ti, i) < (Tj, j) and (Tj, j) < (Ti,i), which are together not possible
+    - What if(Ti, i) < Tj, j) and Pi replied to Pj's request before it created its own request?
+      - Then it seems like both Pi and Pj would approve each others' requests
+      - But then, causality and Lamport timestamps at pi implied that Ti > Tj, which is a contradiction
+      - So this situation cannot arise
+
+- Liveness
+  - Worst-case: wait for all other(N - 1) processes to send Reply
+    (모든 노드가 waiting 또는 held 일때)
+- Ordering
+  - Requests with lower Lamport timestamps are granted earlier
+
+#### Ok, But...
+
+- Compared to Ring-Based approach, in Ricart-Argrwala approach
+  - Client/Synchronization delay has now gone down to O(1)
+    - Client delay : CS에서 나가서 실행 되는데 까지 시간(enter, exit operation에 걸리는 시간)
+    - Synchronization delay : CS진입에 걸리는 시간
+  - ***But bandwidth has gone up to O(N)***
+- Can we get both down?
+
+### 2.4 Maekawa's Algorithm and Wrap-Up
+
+#### Key Idea
+
+- Ricart-Agrawala requires replies from all processes in group
+- ***Instead, get replies from only some processes in group***
+- But ensure that only process one is given access to CS(Critical Section) at a time
+
+#### Maekawa's Voting Sets
+
+- Each process Pi is associated with voting set Vi(of processes)
+- Each process belong to its own voting set
+- The intersection of any two voting sets must be non-empty
+  - ***Same concept as Quorums!***
+- Each voting set is of size K
+- Each process belongs to M other voting sets
+- Maekawa showed that K = M = sqrt(N) works best
+- One way of doing this is to put N processes in a sqrt(N) by sqrt(N) matrix and for each Pi, its voting set Vi = row containing Pi + column containing Pi. Size of voting set = 2 * sqrt(N) - 1
+
+#### Maekawa: Key Differences From Ricart-Agrawala
+
+- Each process request permission from only its voting set members
+  - Not from all
+- Each process(in a voting set) gives permission to at most one process at a time
+  - Not to all
+
+#### Actions
+
+- state = Released, voted = false
+
+- enter() at process Pi:
+
+  - state = Wanted
+  - Multicast Request message to all processes in Vi
+  - Wait for Reply (vote) messages from all processes in Vi (including vote from self)
+  - state = Held
+
+- exit() at process Pi:
+
+  - state = Released
+  - Multicast Release to all processes in Vi
+
+- When Pi received a Request from Pj:
+
+  ```pseudocode
+  if(state == Held or voted == true)
+  	queue request
+  else
+  	send reply to Pj and set voted = ture
+  ```
+
+- When Pi receives a Release from Pj:
+
+  ```pseudocode
+  if(queue empty)
+  	voted = false
+  else
+  	dequeue head of queue, say Pk
+  	Send reply only to Pk
+  	voted = true
+  	//queue 앞에 있던 Pk가 reply 받고 CS 진입 준비
+  ```
+
+#### Safety
+
+- When a process Pi receives replies from all its voting set Vi members, no other process pj could have received replies from all its voting set members Vj
+  - Vi and Vj intersect in at lest one process say Pk
+  - But Pk sends only one Reply(vote) at a time, so it could not have voted for both Pi and Pj
+
+#### Liveness
+
+- A process needs to wait for at most (N-1) other processes to finish CS
+- ***But does not guarantee liveness***
+- ***Since can have a deadlock***
+- Example: all 4 processes need access
+  - P1 is waiting for P3
+  - P3 is waiting for P4
+  - P4 is waiting for P2
+  - P2 is waiting for P1
+  - No progress in the system!
+- There are deadlock-free versions
+
+#### Performance
+
+- bandwidth
+  - 2*sqrt(N) messages per enter()
+  - sqrt(N) messages per exit()
+  - Better than Ricart and Agrawala's (2*(N-1) and N-1 messages)
+  - sqrt(N) quite small. N~1 million => sqrt(N) = 1K
+- Client delay : One round trip time
+- Synchronization delay : 2 message transmission times
+  - Synchronization delay means that one process is currently in the critical section, and one of the processes is waiting to get in
+
+#### Why sqrt(N)?
+
+- Each voting set is of size K
+- Each process belong to M other voting sets
+- total number of voting set members (processes may be repeated) = K * N
+- But since each process is in M voting sets
+  - K*N/M = N => K = M (1)
+- Consider a process Pi
+  - Total number of voting sets = members presents in Pi's voting set and all their sets = (M-1)*K + 1
+    - 자기 voting set 제외한 모든 voting set의 프로세스와 자기자신 의미
+  - This must equal the number of process
+    - 자기 voting set은 제외하고 카운트하는건가...?
+    - rack끼리 CS 정할때 쓰는건가...?
+  - To minimize the overhead at each process (K), need each of the above members to be unique, i.e.,
+    - N = (M-1) * K + 1
+    - N = (K-1)*K + 1(due to (1))
+    - K ~sqrt(N)
+- 1개의 프로세스당 전체 프로세스의 수만큼 voting set이 intersect 되야 함
+  - ex) 4개의 프로세스 있으면 각각의 프로세스는 4개의 voting set과 intersect 되어있어야 함
+
+#### Failures?
+
+- There are fault-tolerant versions of the algorithms we've discussed
+  - e.g., Maekawa
+- One other way to handler failures: Use paxos-lie approaches!
+
+#### Chubby
+
+- Google's system for locking 
+- used underneath Google's system like BigTable, Megastore, etc.
+- Not open-sourced but published
+- Chubby provides Advisory locks only 
+  - Doesn't guarantee mutual exclusion unless every client checks lock before accessing resource
+
+- Can use not only for locking but also writing small configuration files
+- relies on Paxos
+- Group of servers with one elceted as Master
+  - All servers replicate same information
+- Clients send read requests to master, which serves it locally
+- Clients send write requests to master, which sends it to all servers, gets majority (quorum) among servers and then responds to client
+- On master failure, run election protocol
+- On replica failure, just replace it an have it catch up
+
+#### Summary
+
+- Mutual exclusion important problem in cloud commuting systems
+- Classical algorithms
+  - Central
+  - Ring-based
+  - Ricart-Agrawala
+  - Maekawa
+- Industry systems
+  - Chubby: a coordination service
+  - Similarly, Apache Zookeeper for coordination
