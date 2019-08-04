@@ -250,7 +250,7 @@ How prevent it?
 
 #### Pessimistic vs. Optimistic
 
-- Pessimistic : assume the wors, prevent transactions from accessing the same object
+- Pessimistic : assume the worst, prevent transactions from accessing the same object
   - e.g. Locking
 - Optimistic : assume the best, allow transactions to write, but check later
   - e.g. Check at commit time, multi-version approaches
@@ -373,3 +373,289 @@ How prevent it?
 
 - Can we allow more concurrency?
 - Optimistic Concurrency Control
+
+### 1.5 Optimistic Concurrency Control
+
+#### Optimistic Concurrency Control
+
+- Increase concurrency more than pessimistic concurrency control
+
+  (pessimistic concurrency : prevent transactions from accessing the same object)
+
+- Increases transactions per second
+
+- ***For non-transaction systems, increases operations per second and lowers latency***
+
+- Used in Dropbox, Google apps, Wikipedia, key-value stores like Cassandra, Riak, and Amazon's Dynamo
+
+- Preferable than pessimistic when conflicts are expected to be rare
+
+  - But still need to ensure conflicts are caught
+
+#### First-Cut Approach
+
+- Most basic approach
+  - Write and read object at will
+  - Check for serial equivalence at commit time
+  - If abort, roll back updates made
+  - An abort may result in other transactions that read dirty data, also being aborted
+    - Any transactions that read from those transactions also now need to be aborted - Cascading aborts
+
+#### Second Approach: Timestamp ordering
+
+- Assign each transaction an ID
+- Transaction ID determines its position in ***serialization order***
+- Ensure that for a transaction T, both are true:
+  1. T's ***write*** to object O allowed only if ***transactions that have read or written O had lower ids than T.***
+  2. T's ***read*** to object O is allowed only if ***O was last written by a transaction with a lower id that T.***
+- Implemented by maintaining read and write timestamps for the object
+- Transaction id가 일종의 우선순위 처럼 사용 됨
+- If rule violated, abort!
+  - Can we do better?
+
+#### Third Approach: Multi-Version Concurrency Control
+
+- For each object
+  - A per-transaction version of the object is maintained 
+    - Marked as tentative versions
+  - And a committed version
+- Each tentative version has a timestamp
+  - Some systems maintain both a read timestamp and a write timestamp
+- On a read or write, find the "Correct" tentative version to read or write from
+  - "Correct": based on transaction id, and tries to make transactions only read from "immediately previous" transactions
+
+#### Eventual Consistency...
+
+- That you've seen in key-value stores
+- is a form of optimistic concurrency control
+  - In Cassandra key-value store
+  - In DynamoDB key-value store
+  - In Riak key-value store
+- But since non-transaction systems, the optimistic approach looks different
+
+#### Eventual Consistency In Cassandra And DynamoDB
+
+- Only one version of each data item(key-value pair)
+
+- Last-write-wins(LWW)
+
+  - Timestamp, typically based on physical time, used to determine whetere to overwrite
+
+    ```pseudocode
+    if(new write's timestamp > current object`s timestamp)
+    	overwrite;
+    else
+    	do nothing;
+    ```
+
+- With unsynchronized clocks
+
+  - If two writes are close by in time, older write might have a newer timestamp, and might win
+
+#### Eventual Consistency in Riak Key-Value Store
+
+- Uses vector clocks! (Should sound familiar yo you!)
+- Implements causal ordering
+- uses vector clocks to detect whether
+  1. New write is strictly newer than current value, or
+  2. If new write conflicts with existing value
+- In case (2), a sibling value is created
+  - Resolvable by user, or automatically by application (but not by Riak)
+- To prevent vector clocks from getting too many entries
+  - Size-based pruning
+- To prevent vector clocks from having entries updated a long time ago
+  - Time-based pruning
+
+#### Summary
+
+- RPCs and RMIs
+- Transactions
+- Serial Equivalence
+  - Detecting it via conflicting operations
+- Pessimistic Concurrency Control: locking
+- Optimistic Concurrency Control
+
+## Lesson 2: Replication Control
+
+### 2.1 Replication
+
+#### Server-Side Focus
+
+- Concurrency Control = Hot to coordinate multiple concurrent clients executing operations(or transactions) with a server
+
+Next:
+
+- Replication Control = How to handle operations(or transactions) when there are ***objects are stored at multiple servers, with or without replication***
+
+#### Replication: What and Why
+
+- Replication = An object has identical copies, each maintained by a separate server
+  - Copies are called "replicas"
+- Why replication?
+  - ***Fault-tolerance*** : With k replicas of each object, can tolerate failure of any(k - 1) servers in the system
+  - ***Load balancing***: Spread read/write operations out over the k replicas => load lowered by a factor of k compared to a single replica
+  - Replication => Higher Availability
+
+#### Availability
+
+- If each server is down a fraction f of the time
+
+  - Server's failure probability
+
+- With no replication, availability of object 
+
+  ​	= Probability that single copy is up
+
+  ​	= (1 - f)
+
+  - With k replicas, availability of object
+
+    = Probability that at least one replica is up
+
+    = 1 - Probability that ***all replicas are down***
+
+    = (1 - f^k) 
+
+#### What is the Catch?
+
+- Challenge is to maintain two properties
+  1. Replication ***transparency***
+     - A client ought not to be aware of multiple copies of object existing on the server side
+  2. Replication ***Consistency***
+     - All clients see single consistent copy of data, in spite of replication
+     - For transactions, guarantee ACID
+
+#### Replication Consistency
+
+- Two ways to forward updates from front-ends(FEs) to replica group
+  - Passive replication : uses a primary replica(master)
+  - Active Replication : treats all replicas identically
+- Both approaches use the concept of ***"Replicated State Machines"***
+  - Each replica's code runs the same state machine
+  - Multiple copies of the same State machine begun in the Start state, and receiving the same Inputs in the same order will arrive at the same State having generated the same Outputs
+
+#### Passive Replication
+
+- Request
+  - Master => total ordering of all updates
+  - On master failure, run election
+
+#### Active Replication
+
+- Request
+  - Front ends provide replication transparency
+  - Front ends multicast inside replica
+
+> Passive Replication : 저장소에서 election 다시 진행
+>
+> Active Replication : Front ends에서 저장소에 보낼때 multicast로 보냄
+
+#### Active Replication Using Concept You've Learnt Earlier
+
+- Can use any flavor of multicast ordering, depending on application
+
+  - FIFO ordering
+  - Causal ordering
+  - Total ordering
+  - Hybrid ordering
+
+- Total or Hybrid(*-Total) ordering + replicated State machine approach
+
+  => All replicas reflect the same sequence of updates to the object
+
+- What about failures?
+
+  - use virtual synchrony (i.e., view synchrony)
+
+- Virtual synchrony with total ordering for multicasts =>
+
+  - ***Virtual synchrony guarantee that all view changes are delivered in the same order at all correct processes***
+  - All replicas see all failures/joins/leaves and all multicasts in the same order
+  - Could also use causal (or even FIFO) ordering if application can tolerate it
+
+#### Transactions And Replication
+
+- ***One-copy serialization***
+  - A concurrent execution of transactions in a replicated database is one-copy-serializable if it is equivalent to a serial execution of these transactions over a single logical copy of the database
+  - (Or) The effect of transactions performed by clients on replicated objects ***should be the same*** as if they had been performed one at a time on a single set of objects(i.e., 1 replica per object)
+- In a non-replicated system, transactions appear to be performed one at a time in some order.
+  - Correctness means serial equivalence of transactions
+- When objects are replicated transaction systems for correctness need
+  - Serial equivalence + One-copy serializability
+
+#### 2.2 Two-Phase Commit
+
+#### Transaction With Distributed Servers
+
+- Transaction T may touch object that reside on different servers
+- When T tries to commit
+  - Need to ensure all these servers commit their updates from T => T will commit
+  - Or none of these servers commit => T will abort
+- What problem is this?
+  - Consensus!
+  - It is also called the "Atomic Commit Problem"
+
+#### One-Phase Commit
+
+- Special server called "Coordinator" which is elected by leader election initiates atomic commit
+  - Tells other servers to either commit or abort
+
+#### One-Phase Commit: Issues
+
+- Server with object has no say in whether transaction commits or aborts
+  - If object corrupted, it just cannot commit (while other servers have committed)
+- Server may crash before receiving commit message, with some updates still in memory
+
+#### Two-phase Commit
+
+One of the most widely used protocols for committing transactions.
+
+- When server receives a message from coordinator server, 
+  - Save updates to disk
+  - Respond with "Yes" or "No"
+  - If the server fails, it can then recover starting from this log on disk
+- When Coordinator server receive a message and any message is "No" vote or timeout before all votes - ***Abort***
+- All "Yes" votes received within timeout - ***Commit***
+- Servers(not coordinator server) cannot commit or abort before receiving next message!
+  - After receiving, Commit updates from disk to store
+- When Coordinator server receive "Ack" from all server, then two-phase commit is done
+
+#### Failures in Two-Phase Commit
+
+- If server voted Yes, ***it cannot commit unilaterally before receiving Commit message***
+  - Have to wait commit message from coordinator server
+- ***If server voted No, can abort right away(why?)***
+- To deal with server crashes 
+  - Each server saves tentative updates into permanent storage, right before replying Yes/No in first phase. Retrievable after crash recovery
+- To deal with coordinator crashed
+  - Coordinator logs all decisions and received/sent messages on disk
+  - After recovery or new election => new coordinator takes over
+- To deal with Prepare message loss
+  - The server may decide to abort unilaterally(일방적으로) after timeout for first phase(server will vote No, and so coordinator will also eventually abort) 
+- To deal with Yes/No message loss, coordinator aborts the transaction after a timeout(pessimistic!). It must announce Abort message to all.
+- To deal with Commit or abort message loss
+  - Server can poll coordinator(repeatedly)
+
+#### Using Paxos In Distributed Servers
+
+Atomic Commit
+
+- Can instead use paxos to decide whether to commit a transaction or not
+- But need to ensure that if any server votes No, everyone aborts
+
+Ordering updates
+
+- paxos can also be used by replica group (for an object) to order all updates - iteratively do:
+  - Server proposes message for next sequence number
+  - Group reaches consensus (or not)
+
+#### Summary
+
+- Multiple servers in cloud
+  - Replication for Fault-tolerance
+  - Load balancing across objects
+- Replication Flavors using concepts we learnt earlier
+  - Active replication
+  - Passive replication
+- transactions and distributed servers
+  - Two phase commit
