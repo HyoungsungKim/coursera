@@ -101,9 +101,11 @@ Simple common stable hardware substrate below + programmability + string isolati
 
 ## Lesson 2: OS Based Virtualization
 
- What we're going to find is that there's a range of virtualization mechanisms you can use. Some are much more efficient than others, some are much more secure than others. And which one you choose is really going to depend upon your application. 
+ What we're going to find is that there's a range of virtualization mechanisms you can use. Some are much more efficient than others, some are much more secure than others. And which one you choose is really going to depend upon your application.
 
-### Types of Virtualization
+### 2.2.1 OS Based Virtualization
+
+#### Types of Virtualization
 
 - Native, full
 
@@ -137,7 +139,7 @@ Simple common stable hardware substrate below + programmability + string isolati
 
   - Open-VZ -> Virtuozzo
 
-### Native and Full Virtualization
+#### Native and Full Virtualization
 
 - The virtual machine simulate enough hardware to allow an unmodified "guest" OS(one designed for the same CPU) to be run in isolation
 
@@ -153,7 +155,7 @@ Simple common stable hardware substrate below + programmability + string isolati
   - Win4Lin
   - XEN/Virtual Iron
 
-### Hardware Enabled Virtualization
+#### Hardware Enabled Virtualization
 
 - The virtual machine has its own hardware and allows a guest OS to be run in isolation.
 - Intel VT(IVT)
@@ -166,11 +168,11 @@ Simple common stable hardware substrate below + programmability + string isolati
   - Parallels Desktop for Mac
   - Parallels Workstation
 
-### Partial Virtualization
+#### Partial Virtualization
 
 - The virtual machine simulate multiple instances of much (but not all) of an underlying hardware environment, particularly address spaces.
 
-### Paravirtualization
+#### Paravirtualization
 
 Native and Full virtualizing과 유사 하지만 guest OS 수정을 위한 특수한 API 제공
 
@@ -181,7 +183,7 @@ Native and Full virtualizing과 유사 하지만 guest OS 수정을 위한 특�
 - Examples:
   - XEN, KVM, Win4Lin(windows for linux) 9x
 
-### Operating System-Level Virtualization
+#### Operating System-Level Virtualization
 
 - ***Virtualizing a physical server at the operating system level,*** enabling multiple isolated and secure virtualized servers to ***run on a single physical server***
 - Examples:
@@ -191,7 +193,7 @@ Native and Full virtualizing과 유사 하지만 guest OS 수정을 위한 특�
   - FreeBSD Jails
   - Chroot?
 
-### Operating System-Level Virtualization
+#### Operating System-Level Virtualization
 
 - Hypervisor(VM)
   - One real HW, many virtual HWs, many OSs
@@ -204,7 +206,7 @@ Native and Full virtualizing과 유사 하지만 guest OS 수정을 위한 특�
   - Dynamic resource allocation
   - Native performance:[almost]no overhead
 
-### Thinner Containers, Better Performance
+#### Thinner Containers, Better Performance
 
 - Containers
   - Share host OS and drivers
@@ -217,3 +219,131 @@ Native and Full virtualizing과 유사 하지만 guest OS 수정을 위한 특�
 - ***Containers are more elastic than hypervisors***
 - Container slicing of the OS is ideally suited to cloud slicing
 - ***Hypervisors' only advantage in IaaS is support for different OS families on one server***
+
+### 2.2.2 Xen
+
+#### Xen 3.0 Guest VM
+
+What you can see is that most of the application space is pretty much what you would expect from a Unix.
+
+Each of instances, guest VMs, are going to have a root. ***And those roots aren't going to interfere with each other which of course they would've done if you'd put them on a single box with Linux***
+
+> 포트가 독립적으로 사용됨 -> 다른 사용자는 접근 불가
+
+What you see is happening is that the guest OS when it is talking to the drivers
+
+I/O Path
+
+- Process to Guest OS
+- Guest OS to IDD
+
+Resource control
+
+- map virtual Devices
+- CFQ(Completely Fair Queuing) for disk
+- HTB(Hierarchical Token Buckets) for network
+
+Schedules All VMs
+
+- Guest VM & IDD scheduled
+- Two levels scheduling in guest
+
+Resource control of Hypervisor
+
+- Allocate resources
+- Schedule VMs
+
+Security isolation of Hypervisor
+
+- Access physical level
+  - PCI address
+  - Virtual Memory
+
+### 2.2.3 VServer 2.0
+
+#### VServer 2.0 Guest
+
+Resource Control
+
+- map Container to
+  - HTB for network
+  - CFQ for Disk
+- Logical Limit
+  - Processes
+  - Open FD
+  - Memory Locks
+
+Security Isolation
+
+- Access to Logical Objects
+  - Context ID Filter
+  - User IDs
+  - SHM & IPC address
+  - File system Barriers
+
+I/O Path
+
+- Process to COS
+- I/O paths are individualized to each of the different processes and threads in their containers so that you can't actually see from one container to another
+
+Scheduler of container OS
+
+- Single level
+- Token Bucket Filter preserves O(1) scheduler
+- When it does write, it would write to a different place in the disk preventing interference between the different virtualization
+
+Optimizations
+
+- File-level Copy-on-write
+
+Logical virtualization(VServer) is better than physical virtualization(Xen) because physical virtualization use more resource
+
+### 2.2.4 Solaris Zones
+
+#### Solaris Zones
+
+- Zones provide separate virtualized operating system environments that are derived from a Global Zone
+- Multiple zones can share file systems, processors, and network interfaces
+- Scaling and sharing can be configured on as as-needed basis
+- Individual zones gain files and configurations from the Global Zone
+
+There is some benefits a little bit more control perhaps than the Linux world, and the whole thing taken into a Unix world
+
+#### Types of Zones
+
+- Global Zone
+  - All Solaris 10 installations contain a Global Zone
+  - Only the Global Zone is bootable from the system hardware.
+  - The Global Zone contain the complete installation of Solaris, and can contain additional software not installed via packages
+- Local Zones
+  - Local Zones contain a subset of the complete operating system, and can contain non-shared packages
+  - Local Zones have no awareness of other zones.
+  - A Local Zone cannot install, manage, or uninstall itself or any other zone.
+
+#### Zone Daemons
+
+- zoneadmd
+  - Manages zone booting and shutting down
+  - Allocates zone ID and starts the zsched process
+  - Sets zone-wide resource controls
+  - Allocates devices, including plumbing the virtual interfaces for the zones
+  - Manages file-systems including sharing
+- zsched
+  - Zsched manages thread management per zone.
+  - Kernel threads doing work on behalf of the zone are owned by zsched.
+
+#### Zone File Systems
+
+- Sparse Root Model
+  - Minimal number of files from the global zone
+  - Shared files mounted via read-only loopback file systems
+- Whole Root Model
+  - No dependency on share file-systems
+  - Allows superior customization
+  - Local zones cannot be NDF servers!
+
+#### Zones Networking
+
+- Zones have visibility to each other via network interfaces
+- Only the Global Zone Administrator can modify the interface configuration and routes
+- IPMP is configurable in the Global Zone, and IPMP can be extended to Local zones, allowing failover in the event of an interface failure
