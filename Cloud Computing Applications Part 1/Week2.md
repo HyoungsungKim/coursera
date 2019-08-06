@@ -347,3 +347,107 @@ There is some benefits a little bit more control perhaps than the Linux world, a
 - Zones have visibility to each other via network interfaces
 - Only the Global Zone Administrator can modify the interface configuration and routes
 - IPMP is configurable in the Global Zone, and IPMP can be extended to Local zones, allowing failover in the event of an interface failure
+
+## Lesson 3: Containers
+
+### 2.3.1 Docker
+
+- Containers are very useful in building applications, in building parallelism and getting things to switch from to process very fast.
+- They are not so good not security, not as good as the virtual machines, however ***they are actually sort of dominating a lot of the way that clouds get used***
+
+#### Overview
+
+- "Docker containers wrap up a piece of software in a complete file-system that contains everything needed to run: code, runtime, system tools, system libraries-anything you can install on server. ***This guarantees that the software will always run the same, regardless of its environment it is running in.***"
+- Docker automates the deployment of applications inside software containers
+- ***Additional layer of abstraction and automation of operating system level virtualization*** on Linux
+
+#### Basic of Docker
+
+Source code repository
+
+- You are integrating that into a Docker File that contains the file system, the libraries, the interfaces and so on
+  - There is a bunch of source code repositories that are used to help build.
+  - They will be on your sort of build system, your development environment
+
+source code repository -> Build and create in Docker engine(Developer Linux Host) -> container contain all this parts -> transfer(push) to Docker container Image Registry -> pull to Destination Linux Host
+
+Docker Container Image Registry
+
+- People can actually look up that particular component and pulled it down to whichever of the cluster nodes that they want it to run on or maybe all of them
+  - Destination Linux host --search--> Docker Container Image Registry
+  - Docker Container Image Registry --Pull Run--> Destination Linux host
+- You can do it under program controller, but pull this stuff down and run associate it with your Linux and it is going to run on top of your Linux almost like another VM
+- It is running at user level, so working you have your threads all operating asynchronously.
+
+#### Changes and Updates
+
+Docker Container Image Registry let container can update and upgrade
+
+- Container = App + (Bins & Libs)
+  - 업데이트가 있으면 Bins & Libs 만 교체하여 App 업데이트 가능
+- Docker system provides a mechanism to simplify the whole distribution of the docker containers and completely automates the way that operates.
+
+### 2.3.2 Kubernetes
+
+This is a very cool development on top of Docker, on top of containers. How do you build sort of complicated systems? Kubernetes will help you
+
+#### Overview
+
+- Kubernetes provides a "platform for automating deployment, scaling, and operations of application containers across clusters of hosts"
+- Let's suppose you are doing stream processing and you have five streams and you want to allocate them through a thousand hosts in some way
+  - You want to do load balance and all these other good things
+  - That is where Kubernetes comes in and it actually provides you a tremendous way of doing this without working too hard
+
+#### Parts
+
+Kinds of interesting to think about how you develop from docker and containers to these parts
+
+One of the issues when you are building these things is it's built on a distributed system
+
+- Loosely coupled building blocks
+
+  - You push those building blocks to talk to other building blocks in other nodes in a loosely coupled way,
+  - effectively ignoring the fact that you are going from one system to another
+
+- Pods
+
+  - ***Pod is multiple of dockers,*** but pod restricts and constrains what you can do with all of those containers as a unit
+  - ***Unique IP address*** of a collection of co-located(in the same machine or in the same docker) containers
+  - No(prevent) collisions on IP port address
+    - Effectively sort of making each of those containers a separate entity that you can address with IP addresses and so on
+    - SO you don't have to worry about allocating the same IPs
+  - It provides a volume(network disk or local directory) shared by containers in a pod
+    - It is not going to interfere with other pods
+  - What it is going to go is to provide you a way of thinking about this is just your own environment that can't be interacted with by other people, that you can actually know what is going on inside the system.
+  - So you've got unique IP port addresses, but naturally enough you'd like to do is also have some sort of search capability, some sort of find me a pod, find me a particular thread inside the container and all this type of request. -> There is a nice interesting abstraction: ***Labels and Selectors***
+
+- Labels and Selectors
+
+  - Key-value pair (label) that resolves (selector) to a pod or node component or container
+  - You can give it as a label and then ***use that label to find that particular element without having to know the IP address or knowing where it is***
+    - Label을 DNS 처럼 사용하는 듯...?
+    - You can actually use that Labels and Selectors to find it
+  - Selector
+    - Selector is the sort of like query element
+    - It is searching through, looking for that particular entity
+    - ***It is sort of really mapping whatever you want,*** whatever space of names you those labels on to the actual implementation
+
+  - Controllers
+    - Manages pods :
+      - Replication Controller (replacement)
+        - For example) I want this pod but i am in danger of that perhaps i might just flood this plant and it may die for some strange memory management reason, so i want to make multiple copies of it
+      - Daemon Set Controller (Keeps one pod on every machine in a set running)
+        - You can set Daemon set controller how it allocates those pods on machines to avoid problems
+      - Job controller(runs "batch" pods to completion)
+        - A lot of jobs want to run batch you want settle set up this job start it running, go away, later on perhaps come back to collect the result, you don't want to sort of supervise it - job controller does that instead you
+        - What it will do is batch pods and then run them to completion so it effectively gives you that type of environment where you can sort of set it in motion go have coffee when it is finished come back collect the final finished product
+        - You can of course batch pods one after the other so that one pod builds things that another pod uses and so on
+  - Services
+    - Set of pods working together
+      - you have services inside the pods that the other pods want to talk to
+      - So if you like when you are trying to do inter-pod interaction the services enable this(Label selector)
+    - Label selector
+      - Select the actual pod that you want of selecting
+    - Service discovery and request routing - stable IP address and DNS name
+    - Round robin load balancer to network IP address
+
