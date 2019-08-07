@@ -451,3 +451,156 @@ One of the issues when you are building these things is it's built on a distribu
     - Service discovery and request routing - stable IP address and DNS name
     - Round robin load balancer to network IP address
 
+## Lesson 4: Infrastructure as a Service (IaaS)
+
+### 2.4.1 IaaS: OpenStack
+
+#### OpenStack
+
+- "The OpenStack" project has been created with the audacious(대담한) goal of being the ubiquitous software choice for building cloud infrastructures."
+- "OpenStack is a collection of open source software projects that enterprises/service providers can use setup and run their cloud compute and storage infrastructure"
+
+#### OpenStack architecture
+
+- Dashboard : the dashboard talks to all of the various elements
+  - Controller on the dashboard, they are going to map to the compute networking storage elements that you require for you OpenStack
+  - When application is no longer needed, you can just give it to somebody else
+  - If you want to bring it back later you can do the same
+
+#### OpenStack's Core Components
+
+- Compute ("Nova")
+  - Orchestrates large network for Virtual machines
+  - Responsible for VM instance lifecycle, network management, and user access control
+- Object Storage ("Swift")
+  - Provide scalable, redundant, long-term
+  - Storage for things like VM images, data archives & multimedia
+- Image Service("Glance")
+  - Manages VM disk images
+  - Can be stand-alone service
+  - Support private/public permissions, and can handle a variety of disk image formats
+
+### 2.4.2 IaaS Providers: Amazon
+
+### Amazon Web Services
+
+- AWS provides a collection of services for building cloud application
+- Services for :
+  - Storage : S3, EBS
+  - Computation : Elastic Cloud Computing(EC2), scaling/load balancer, Elastic MapReduce, Elastic Beanstalk
+  - Database : RDS, DynamoDB, ElastiCache
+  - Coordination: Simple Notification Service, Simple Workflow Framework
+- All services are paid depending on use
+
+- Amazon EC2 : Resizable compute capacity in the Cloud
+- Amazon DynamoDB : Fast and flexible NoSQL database with seamless scalability
+- AWS Lambda : Compute service that runs your code in response to events and automatically manages the compute resources
+- Amazon S3 : Highly scalable, reliable and low-latency data storage infrastructure.
+
+#### 6 Types of Instances
+
+- Micro Instance(Free Tier)
+- General Purpose
+- Memory Optimized
+- Storage Optimized
+- Compute optimized
+- GPU Instances
+
+#### Storage
+
+- Transient, instance-specific storage
+- Persistent, instance-independent Elastic Block Store(EBS) storage (SSD and encryption options)
+- Object-based Simple Storage Service(S3)
+- Data restricted to region
+
+#### Networking
+
+- Virtual Private Cloud(=VPN)
+- Private routing between VPCs
+- VPN tunnels can connect your enterprise to Amazon
+- DirectConnect allows customer to use carrier for private WAN services
+
+### 2.4.3 IaaS Provider: Microsoft
+
+#### Microsoft
+
+- Cloud first, mobile first
+- Virtualization provided by Hyper-V to rival VMware
+- Microsoft Azure is IaaS and PaaS
+- Office 365 and Office for iPad
+- SharePoint
+- Yammer (social and collaboration)
+- Exchange (primary competitor Google gmail)
+- Dynamics CRM
+
+#### Microsoft Azure
+
+- It was launched by Microsoft in 2010
+- Provides both PaaS and IaaS services
+- It is like a hybrid cloud provider that tries to do multiple things
+
+#### Uses of Azure
+
+- Can be used for anything since it provides IaaS services that can host virtual machines
+- however, its PaaS services have been known to host web sites that may receive a lot of traffic
+- Food for .NET developer
+
+#### Azure Cloud
+
+- Microsoft developed their own operating system called Windows Azure that is used for their datacenter cluster
+- Uses hyper-V, a windows server Hypervisor that can run virtual machines
+
+#### Windows Server
+
+- Has support for Windows server
+- Can provision and manage virtual machines
+- Can attach and manage disks
+
+#### Windows Azure
+
+- ***Windows Azure is the OS for the data center***
+  - Model : treat the data center as a machine
+  - Handles resources management, provisioning, and monitoring
+  - Manages application lifecycle
+  - Allows developer to concentrate on business logic
+- Provides shared pool of compute, disk and network
+  - Virtualized storage, compute and network
+  - Illusion of boundless resources
+- Provides common building blocks for distributed applications
+  - Reliable queuing, simple structured storage, SQL storage
+  - Application services like access control and connectivity
+
+#### Modeling Cloud Applications
+
+- A cloud application is typically made up of different components
+  - Front end : e.g. load-balanced stateless web servers
+  - Middle worker tier : e.g. order processing, encoding
+  - Backend storage : e.g. SQL tables or files
+  - Multiple instances of each for scalability and availability
+
+#### The Windows Azure Service Model
+
+- A windows Azure application is called a "service"
+  - Definition information
+  - Configuration information
+  - At least one "role"
+- Roles are like DLLs in the service "process"
+  - Collection of code with an entry point that runs in its own virtual machine
+- There are currently three role types:
+  - Web Role : IIS7 and ASP.Net in Windows Azure-suppkued OS
+  - Worker Role : arbitrary code in Windows Azure-supplied OS
+  - VM Role : uploaded VHD with customer-supplied OS
+
+#### Role Contents
+
+- Definition:
+  - Role name
+  - Role type
+  - VM size(e.g. small, medium, etc.)
+  - Network endpoints
+- Code:
+  - Web/Worker Role : hosted DLL and other executables
+  - VM Role : VHD
+- Configuration:
+  - Number of instances
+  - Number of update and fault domains
