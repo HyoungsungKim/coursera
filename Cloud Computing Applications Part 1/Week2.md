@@ -604,3 +604,64 @@ One of the issues when you are building these things is it's built on a distribu
 - Configuration:
   - Number of instances
   - Number of update and fault domains
+
+### 2.4.5 Serverless Architecture
+
+What does serverless architecture mean?
+
+- What we really mean by serverless architecture is ***pretty much an extension of the platform as a service*** sort of model that we've talked about in previous videos
+- Remember in previous videos we say for platform as a service, the cloud provider would provide you with a certain platform
+- It kind of encompasses(둘러싼) infrastructure, not infrastructure, platform as a service
+
+### Introduction to Serverless Architecture
+
+- "Application where some amount of server-side logic is still written by the application developer but unlike traditional architectures is run in stateless compute containers that are event-triggered, ephemeral (may only last for one invocation), and fully managed by a 3rd party"
+- Functions as as service / FaaS
+  - The idea here is that your application is written in terms of very small chunks, just one function,
+  - And then the infrastructure would run your function in response to a certain event
+- Let me quickly bring up a container-based ephemeral set of resources so that i can quickly run this FaaS
+- ***Containers are the foundational technology behind the serverless architecture***
+  - Very quickly bring up
+  - Very quickly get rid of
+- ***AWS Lambda*** is one of the most popular implementations of FaaS at present, but there are others
+  - Lambda is game changer
+
+### AWS Cloud Platform 2016
+
+- With the serverless architecture, you have this layer implemented on top f all the clouds services that are implemented before
+- So we have something called ***Lambda***
+- Now you don't need to interact with infrastructure as a service, which was what?
+  - EC2 and elastic load balancer, and whatnot, which you can still use, but you don't need to anymore
+  - Now you don't quite even need to use platform as a service like Elastic Beanstalk and whatnot
+- Now you just write a function and you let the cloud platform figure out everything about the function
+  - How to scale it, when to scale it, where the input data comes from, how the users' requests get routed to your function, everything is pretty much now handled by the cloud infrastructure
+- Lambda is quite a game changer now in 2016 because not only you don't need to have your resources, you go to the cloud. you don't need to even get an EC2 instance and pay per hour.
+  - You write your function and pay per instance call of your function, which is a very interesting model
+
+### AWS Elastic BeanStalk
+
+Before jumping into Lambda, talk about Elastic BeanStalk
+
+- Deploy and scale web application easily
+- Simply upload your code
+
+### AWS Lambda Event-driven Compute
+
+Lambda is a complete event driven compute
+
+> state : 상태를 저장하고 있음. 따라서 이전에 어떤 일이 일어났는지를 포함하고 있음
+
+- Whole Lambda infrastructure just the function, that five lines of code or something. ***This function should be stateless.***
+  - So basically the function should not keep track of what it has done before
+- Runs stateless, request-driven code called Lambda functions in Java, NodeJS & Python
+- Triggered by events (state transitions) in other AWS services
+- Pay only for the request served and the compute time
+- ***Focus on business logic, not infrastructure.***
+- Just upload your code; AWS Lambda handles
+
+### AWS Lambda Execution Environment
+
+- State-less functions
+- You can use multi-threading
+- Function should finish in a certain time
+  - Default 3 seconds, up to 300 seconds
