@@ -191,3 +191,179 @@ How is a Storm cluster server run?
 - Parallelism
 - Application topologies
 - Fault-tolerance
+
+## Lesson 2: Distributing Graph Processing
+
+### What we will cover
+
+- Distributed Graph Processing
+- Google's Pregel system
+  - Inspiration for many newer graph processing systems: Piccolo, Giraph, Graphlab, PowerGraph, LFGraph, X-Stream, etc.
+
+### What is Graph?
+
+- A graph is not a plot!
+- ***A graph is a "network"***
+- A graph has vertices (i.e., nodes)
+  - e.g., in the Facebook graph, each user = a vertex(or a node)
+- A graph has edges that connect pairs of vertices
+  - e.g., in the Facebook graph, a friend relationship = an edge
+
+### Lots of Graphs
+
+- Large graphs are all around us
+  - Internet Graph : vertices are routers/switches and edges are links
+  - World wide Web : vertices are web-pages, and edges are URL links on a web-page pointing to another web-page
+    - Called "Directed" graph as edges are uni-directional
+  - Social Graphs : Facebook, Twitter, LinkedIn
+  - Biological graphs : DNA interaction graphs, ecosystem graphs, etc.
+
+### Graph Processing Operations
+
+- Need to derive properties from these graphs
+- Need to summarize these graphs into statistics
+- e.g., find shortest paths between pairs of vertices
+  - internet(for routing)
+  - LinkedIn(degree of separation)
+- e.g., do matching
+  - Dating graphs in match.com (for better dates)
+- And many (many) other examples!
+
+### Why Hard?
+
+- Because these graphs are large!
+  - human social network has 100s Millions of vertices and Billions of edges
+  - WWW has Millions of vertices and edges
+- ***hard to store the entire graph on one server and process it***
+  - Slow on one server(even if beefy!)
+- Use distributed cluster/cloud!
+
+### Typical Graph Processing Application
+
+- Works in iterations
+
+- Each vertex assigned a value
+
+- In each iteration, each vertex :
+
+  1. Gathers values from its immediate neighbors(vertices who join it directly with an edge). e.g., A: B->A, C->A, D->A...
+  2. Does some computation using its own value and its neighbors values
+  3. Updates its new value and sends it out to its neighboring vertices.
+     e.g., A->B,C,D,E
+
+- Graph processing terminates after :
+
+  i) fixed iterations,
+
+  ii) vertices stop changing values
+
+### Hadoop/MapReduce to the Rescue
+
+In order to run this in a distributed system, can we use Hadoop?
+
+- If you load this using Hadoop, we would have a multistage Hadoop. Where you would have one MapReduce phase for each iteration. ***So each MapReduce stage would be one iteration***
+- So if you had 100 iterations you would have 100 chained Hadoop or MapReduce jobs after the other.
+
+- Multi-stage Hadoop
+- Each stage == 1 graph iteration
+- ***Assign vertex ids as keys in the reduce phase***
+  - Well-known
+  - At the end of every stage, transfer all vertices over network
+    - All vertex values written to HDFS(file system)
+    - ***Very slow!***
+
+> iteration마다 reduce -> assign id -> store in HDFS : 매우 느림
+
+Hadoop is easy to code up but it is very very slow as far as the graph concern of processing
+
+### Bulk Synchronous Parallel Model
+
+- "Think like a vertex"
+- Where you have local competition being done at multiple processors parallelly.
+- Each vertex is computed separately by a different processor. But at the end of iteration, ***all the processors meet a barrier***
+- But all of them wait for all of the other processors to complete there iteration, and only then do they proceed into the next iteration.
+
+### Basic Distributed Graph Processing
+
+- "Think like a vertex"
+- Assign each vertex to one server
+- Each server thus gets a subset of vertices
+- In each iteration, each server performs Gather-Apply-Scatter for all its assigned vertices
+  - Gather: get all neighboring vertices' values
+  - Apply: compute own new value from own old value and gathered neighbors' values
+  - Scatter: send own new value to neighboring vertices
+
+### Assigning Vertices
+
+- How to decide which server a given vertex is assigned to?
+- Different options
+  - hash-based : hash(vertex id) modulo number of servers
+    - Random but it is consistent
+    - Remember consistent hashing from P2P systems?!
+  - Locality-based : Assigned vertices with more neighbors to the same server as its neighbors
+    - Reduce server to server communication volume after each iteration
+    - Do not involve any network overhead
+
+### Pregel System By Google
+
+- Pregel uses the master/worker model
+  - Theses would also be the master daemons and the worker daemons running on each of the other servers
+  - Master(one server) responsible for
+    - Maintain list of worker servers
+    - Monitors workers; restarts them on failure
+    - Provides Web-UI monitoring tool of job progress
+  - Worker (rest of the servers) responsible for
+    - Processes its vertices
+    - Communicates with the other workers
+- Persistent data is stored as files on a distributed storage system(such as GFS or BigTable)
+- Temporary data is stored on local disk
+
+### Pregel Execution
+
+1. Many copies of the program begin executing on a cluster
+2. The master assigns a partition of input (vertices) to each worker
+   - Each worker loads the vertices and marks them as active
+3. The master instructs each worker to perform a iteration
+   - Each worker loops through its ***active vertices*** & computes for each vertex
+   - Messages can be sent whenever, but need to be delivered before the end of the iteration(i.e. the barrier)
+   - ***When all workers reach iteration barrier, master starts next iteration***
+4. ***Computation halts when in some iteration:*** 
+   - No vertices are active 
+   - When no messages are in transit
+5. Master instructs each worker to save its portion of the graph
+
+What about failures?
+
+### Fault-Tolerance In Pregel
+
+- Checkpointing
+  - Periodically, master instructs the workers ***to save state of their partitions to persistent storage***
+    - e.g., Vertex values, edge values, incoming messages
+- Failure detection
+  - Using periodic "Ping" messages from master -> worker
+- Recovery
+  - The master reassigns graph partitions to the currently available workers
+  - The workers all reload their partition state from most recent available checkpoint
+
+### How fast is it?
+
+- Shortest paths from one vertex to all vertices
+  - SSSP : "Single Source Shortest path"
+- On 1 Billion vertex graph(tree)
+  - 50 workers : 180 seconds
+  - 800 workers : 20 seconds
+- 50B vertices on 800 workers : 700 seconds (~12 minutes)
+- Pretty Fast!
+
+> Blockchain network topology랑 비슷한가...?
+
+### Summary
+
+- Lots of (large) graphs around us
+- need to process these
+- MapReduce(Hadoop) not a good match
+  - MapReduce is an attractive approach but it is not very fast, not efficient
+- Distributed Graph Processing systems : Pregel by Google
+- Many follow-up systems
+  - Piccolo, Giraph : Pregel-like
+  - GraphLab, PowerGraph, LFPraph, X-Stream : more advanced
