@@ -367,3 +367,104 @@ What about failures?
 - Many follow-up systems
   - Piccolo, Giraph : Pregel-like
   - GraphLab, PowerGraph, LFPraph, X-Stream : more advanced
+
+## Lesson 3: Structure of Network
+
+### What is a Network/Graph
+
+- Has vertices (i.e., nodes)
+  - e.g., in the facebook graph, each user = a vertex(or a node)
+- has edges that connect pairs of vertices
+  - e.g., in the Facebook graph, a friend relationship = an edge
+
+### Complexity of Network
+
+- Structural : human population has ~ 7B nodes, there are millions of computers on the Internet...
+- Evolution : people make new friends all the time, ISP's change hands all the time...
+- Diversity : some people are more popular, some friendships are more important...
+- Node Complexity : Endpoints have different CPUs Windows is a complicated OS, Mobile devices...
+- Emergent phenomena : simple end behavior -> leads to -> complex system-wide behavior
+  - If we understand the basics of climate change, why is the weather so unpredictable
+
+### Two Important Network Properties
+
+1. Clustering Coefficient : CC
+   - Pr(A-B edge, given an A-C edge and a C-B edge)
+2. Path Length of shortest path
+   - Extended Ring graph : high CC, long paths
+   - Random graph : low CC, short paths
+   - Small World Networks : high CC, short paths
+   - “Six degrees of Kevin Bacon” : Real world is high CC and low paths(6 paths are enough)
+
+### Small-World Network All Around
+
+Most "natural evolved" networks are small world
+
+- Network of actors -> six degrees of Kevin Bacon
+- Network of humans -> Milgram's experiment
+- Co-authorship network -> "Erdos Number"
+- World Wide Web, the Internet...
+
+Many of these networks also "grow incrementally" "Preferential" model of growth
+
+- When adding a vertex to graph, ***connect it to existing vertex v with probability proportional*** to num_neighbors(v)
+
+### Degree
+
+- Degree of a vertex : number of its immediate neighbor vertices
+- Degree distribution : What is the probability of a given node having k edges (neighbors, friends, ...)
+
+- Regular graph : all nodes same degree
+- Gaussian
+- Node degree : k
+- Random graph : Exponential e^(-k*c), c is constant
+- Power law : k^(-a)
+  - When k is pretty small like 1,2 or 3, this probability is very high
+  - But as k increases, this probability drops off very quickly
+
+### Small-World and Power-Law
+
+- A lot of small world network are power law graphs
+  - Internet backbone, telephone call graph, protein networks
+  - WWW is a small-world graph and also a power-law graph with a = 2.1-2.4
+  - Gnutella p2p system network has heavy-tailed degree distribution
+- Power law networks also called scale-free
+  - Gnutella has 3.4 edges per vertex, independent of scale (i.e., number of vertices)
+
+### Small-World != Power-Law
+
+- Not all small world networks are power law
+  - e.g., co-author networks
+- Not all power-alw networks are small world
+  - e.g., Disconnected power-law networks
+
+### Resilience of Small-world + Power-Law
+
+Most nodes have small degree, but a few nodes have high degree
+
+Attack on small world networks
+
+- Killing a large number of randomly chosen nodes does not disconnect graph
+- ***Killing a few high-degree nodes will disconnect graph***
+
+"The Electric Grid is very vulnerable to attacks"
+
+### Routing in Small-World/Power-Law Networks
+
+- Build shortest-path routes between every pair of vertices
+- -> Most of these routes ***will pass via few high-degree vertices in the graphs***
+  - High-degree vertices are heavily overloaded
+  - High-degree vertices more likely to suffer congestions or crash
+- Same phenomenon in Electric power gird
+- Solution may be to introduce some randomness in path selection; ***don't always use shortest path*** -> That is why probability connection
+
+### Summary
+
+- Network(graphs) are all ground us
+  - Man-made networks like Internet, WWW, p2p
+  - Natural networks like protein networks, human social network
+- Yet, many of these have common characteristics
+  - Small-world
+  - Power-law
+- useful to know this : when designing distributed systems that run on such networks
+  - Can better predict how these networks might behave
