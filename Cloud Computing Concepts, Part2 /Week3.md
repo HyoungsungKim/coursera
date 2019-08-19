@@ -421,6 +421,7 @@ Many of these networks also "grow incrementally" "Preferential" model of growth
 - Power law : k^(-a)
   - When k is pretty small like 1,2 or 3, this probability is very high
   - But as k increases, this probability drops off very quickly
+  - 노드 degree 높은 노드의 개수는 적고, 노드 degree 낮은 노드는 매우 많음
 
 ### Small-World and Power-Law
 
@@ -435,7 +436,7 @@ Many of these networks also "grow incrementally" "Preferential" model of growth
 
 - Not all small world networks are power law
   - e.g., co-author networks
-- Not all power-alw networks are small world
+- Not all power-law networks are small world
   - e.g., Disconnected power-law networks
 
 ### Resilience of Small-world + Power-Law
