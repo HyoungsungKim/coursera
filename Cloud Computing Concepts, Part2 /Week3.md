@@ -469,3 +469,162 @@ Attack on small world networks
   - Power-law
 - useful to know this : when designing distributed systems that run on such networks
   - Can better predict how these networks might behave
+
+## 4.1 Single-processor Scheduling
+
+### Why Scheduling?
+
+- Multiple "tasks" to schedule
+  - The processes on a single-core OS
+  - The tasks of a Hadoop job
+  - The tasks of multiple Hadoop jobs
+- Limited resources that these tasks require
+  - processor(s)
+  - memory
+  - (Less contentious) disk, network
+- Scheduling goals
+  - Good throughput or response time for tasks(or jobs)
+  - High utilization of resources
+
+### FIFO(FCFS) performance
+
+- Average ***completion time may be high***
+- For example, length 10, 5, 3 tasks come then completion time is 10, 15, 18
+  - Average completion time is 14.33
+
+### STF Scheduling (Shortest Task First or SJF - Shortest Job First)
+
+- Average completion of STF is the shortest among all scheduling approaches!
+- For example, length 10, 5, 3 tasks come then completion time is 3, 8, 18
+  - Average completion time is 9.66
+- In general, STF is a special case of priority scheduling
+  - Instead of using time as priority, scheduling could use user-provided priority
+
+### Round-Robin Scheduling
+
+- Round-robin gives a fair share of the resource, the processor, to all the tasks that are present in the system.
+
+### Round-Robin vs STF/FIFO
+
+- Round-Robin preferable for
+  - Interactive applications
+  - User needs quickly response from system
+- FIFO/STF preferable for Batch applications
+  - User submit jobs, goes away, comes back to get result
+
+### Summary
+
+- Single processor scheduling algorithms
+  - FIFO/FCFS
+  - Shortest task first(optimal!)
+  - Priority
+  - Round-robin
+  - Many other scheduling algorithms out there!
+- What about cloud scheduling?
+  - Next!
+
+## 4.2 Hadoop Scheduling
+
+### Hadoop Scheduling
+
+- A Hadoop job consists of Map tasks and Reduce tasks
+- Only one job in entire cluster => it occupies cluster
+- Multiple customers with multiple jobs
+  - User/jobs = "tenants"
+  - Multi-tenant system
+- Need a way to schedule all these jobs (and their constituent tasks)
+- Need to be fair across the different tenants
+- Hadoop YARN has two popular schedulers
+  - Hadoop Capacity Scheduler
+  - Hadoop Fair Scheduler
+
+### Hadoop Capacity Scheduler
+
+- Contains multiple queues
+- Each queue contains multiple jobs
+- Each queue guaranteed some portion of the cluster capacity
+  - e.g
+  - Queue 1 is given 80% of cluster
+  - Queue 2 is given 20% of cluster
+  - Higher-priority jobs go to Queue 1
+- For job within same queue, FIFO typically used
+- Administrators can configure queues
+
+### Elasticity in HCS
+
+- Administrators can configure each queue with limits
+  - Soft limit: how much % of cluster is the queue guaranteed to occupy
+  - (optional) hard limit : max % of cluster the queue is guaranteed
+- Elasticity
+  - A queue allowed to occupy more of cluster if resources free
+  - But if other queues below their capacity limit, now get full, need to give these other queues resources
+- Pre-emption now allowed!
+  - ***Cannot stop a task part-way through***
+  - When reducing % cluster to a queue wait until some tasks of that queue have finished
+
+### Other HCS Features
+
+- Queues can be hierarchical
+  - may contain sub-queues, which may contain child sub-queues, and so on
+  - Child sub-queues can share resources equally
+- Scheduling can take memory requirements into account(memory specified by user)
+
+### Hadoop Fair Scheduler
+
+- ***Goal : all jobs get equal share of resources***
+- When only one job present, occupies entire cluster
+- As other jobs arrive, each job given equal % of cluster
+  - e.g., Each job might be given equal number of cluster-wide YARN containers
+  - Each container == 1 task of job
+- Divides cluster into pools
+  - Typically one pool per user
+- resources divide equally among pools
+  - Gives each user fair share of cluster
+- Within each pool, can use either
+  - Fair share scheduling, or
+  - FIFO/FCFS
+  - (Configurable)
+
+### Pre-emption in HFS
+
+- Some pools may have minimum shares
+  - Minimum % of cluster that pool is guaranteed
+- When minimum share not met in a pool, for a while
+  - Take resources away from other pools
+  - By pre-empting jobs in those other pools
+  - By killing the currently-running tasks of those jobs
+    - tasks can be re-started later
+    - Ok since tasks are idempotent!
+  - To kill, scheduler picks most-recently-started tasks
+    - Minimizes wasted work 
+
+### Other HFS Features
+
+- Can also set limits on
+  - Number of concurrent jobs per user
+  - Number of concurrent jobs per pool
+  - Number of concurrent tasks per pool
+- Prevents cluster from being hogged by one user/job
+
+### Estimating Task Lengths
+
+- HCS/HFS use FIFO
+  - May not be optimal(as we know!)
+  - Why not use shortest-task-first instead? it is optimal (as we know)
+    - FIFO is not a optimal way
+- ***Challenge : Hard to know expected running time of task(before it is completed)***
+- ***Solution : Estimate length of task***
+- Some approaches
+  - Within a job : Calculate running time of task as proportional to size of its input
+  - Across tasks : Calculate running time of task in a given job as average of other tasks in that given job(weighted by input size)
+- Lots of recent research in this area!
+
+### Summary
+
+- Hadoop Scheduling in YARN
+  - Hadoop Capacity Scheduler
+  - Hadoop Fair Scheduler
+- Yet, so far we've talked of only one kind of resource
+  - Either processor, or memory
+  - How about multi-resource requirements?
+  - Next!
