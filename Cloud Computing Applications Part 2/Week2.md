@@ -136,3 +136,103 @@ There is no way to determine whether a message has been lost or just arbitrarily
 - Privacy : will not disclose personal data
 - Fault-tolerance : Failures cannot prevent the system from providing desired services
 - Coordination : Actions will not interfere with one-another
+
+## 2.2.3 Consistency Trade-Offs
+
+### Trade-Off
+
+- CAP is a warning that strong properties can easily lead to slow services
+- ***Weak properties are often a successful strategy that yields a good solution and requires less effort***
+
+## 2.2.4 ACID and trade-Offs
+
+### Consistent Transactions in the Clouds
+
+- What if we do need consistency?
+- We will cover consistent transactions today:
+  - Easy way : ACID -> BASE
+  - Distributed Transactions with Locking
+    - Use Locking (Zookeeper, Paxos)
+    - Two-phase locking
+  - Distributed Transactions with Time Stamps
+    - Time
+      - Lamport's logical clocks
+      - Real GPS-based clocks
+  - Distributed Transactions with Snapshots
+
+### The ACID Model
+
+- A model for correct behavior of databases
+- Name was coined in '60s
+  - Atomicity : even if "transactions" have multiple operations, does them to completion (commit) or rolls back so that they leave no effect(abort)
+  - Consistency : A transaction that runs on a correct database leaves it in a correct ("Consistent") state
+  - Isolation : It looks as if each transaction ran all by itself. Basically says "We will hide any concurrency"
+  - Durability : once a transaction commits, updates cannot be lost or rolled back
+
+### Why is ACID Helpful
+
+- Developer doesn't need to worry about a transaction leaving some sort of partial state
+  - For example, showing Tony as retired and yet leaving some customer accounts with him as the account rep
+- Similarly, a transaction can't glimpse a partially completed state of some concurrent transaction
+  - Eliminates worry about transient database inconsistency that might cause a transaction to crash
+  - Analogous situation : thread A is updating a linked list and thread B tries to scan the list while A is running
+
+### Dangers of Replication
+
+(gray, Helland, & Shasha, 1996)
+
+- Investigated the costs of transactional ACID model on replicated data in "typical" settings
+  - Found two cases
+    - Embarrassingly easy once : transactions that don't conflict at all (like Facebook updates by a single owner to a page that others might read but never change)
+    - Conflict-prone ones: transactions that sometimes interfere and in which replicas could be left in conflicting states if care isn't taken to order the updates
+  - Scalability for the latter case will be terrible
+- Solutions they recommend involve sharding and coding transactions to favor the first case
+- Show that even under very optimistic assumptions slowdown will be O(n^2) in size of replica set (shard)
+- If approach is naive, O(n^5) slowdown is possible!
+
+### This Motivates BASE
+
+(Pritchett, 2008)
+
+- Proposed by eBay researchers
+  - Found that many eBay employees came from transactional database backgrounds and were used to the transactional style of "thinking"
+  - But the resulting applications didn't scale well and performed poorly on their cloud infrastructure
+- Goal was to guide that kind of programmer to a cloud solution that performs much better
+  - Base reflects experience with real cloud applications 
+  - "Opposite" of ACID 
+
+### BASE is a methodology
+
+- Base involves step-by-step transformation of a transactional application into one that will be far more concurrent and less rigid
+  - But it doesn't guarantee ACID properties
+  - Argument parallels (and actually cities) CAP : they believe that ACID is too costly and often, no needed
+  - BASE stands for ***"Basically Available Soft-State Services with Eventual Consistency"***
+    - Trying to make it eventually consistent
+- It does provide parallelism, it sore of is a parallel to CAP, it doesn't do everything, it doesn't solve CAP problem at all
+- What it does instead is to effectively live on this spectrum going from a rigidly acid system to something that is actually serving your purpose, but can sometimes mislead the clients because the values would be out of data
+
+### BASE Terminology
+
+- Basically Available : Fast response even if some replicas are slow or crashed
+  - BASE paper : In data centers, partitioning fault are very rare and are mapped to crash failures by forcing the isolated machines to reboot
+- Soft-State Service : No durable memory
+  - Cannot store any permanent data
+  - Restarts in a "clean" state after a crash
+  - To remember data, either replicate it in memory in enough copies to never lose all in any crash, or pass it to some other service that keeps "hard state"
+- Eventual Consistency :  Ok to send : "optimistic" answers to the external client
+  - Could use cached data (without checking for staleness)
+  - Could guess at what the outcome of an update will be
+  - Might skip locks, hoping that no conflicts will happen
+  - Later, if needed, correct any inconsistencies in an off-line cleanup activity
+    - If any of these things are not quite right that lead to inconsistencies in the values
+    - At some point, you can actually correct the inconsistencies by sort of doing a cleanup of everything that is there
+
+### BASE vs ACID
+
+- ACID Code often much too slow, scale poorly, and end user waits a long time for responses
+- With Base
+  - Code itself is way more concurrent, hence faster
+  - Elimination of locking, early responses, all make end user experience snappy and positive
+  - But we do sometimes notice oddities when we look hard
+    - Slightly different bidding histories shown to different people shouldn't hurt much if this makes eBay 10x Faster
+    - Upload a Youtube video, then search for it -> You may not see it immediately
