@@ -354,7 +354,7 @@ Promise:
 
 ## 2.2.7 Zookeeper
 
-### What is ZoooKeeper
+### What is ZooKeeper
 
 - A highly available, scalable, distributed, configuration, consensus, group membership, leader election, naming and coordination service
 - Difficult to implement these kinds of services reliably
@@ -388,7 +388,7 @@ Once the majority of service have stored on their file systems the value, then t
 3. Followers service clients; all updates go through leader
 4. Update response are sent when a majority of servers have persisted the change
 
-### ZooKeeper Servoce
+### ZooKeeper Service
 
 - All servers store a copy of the data, logs, and snapshots on disk and use an in-memory database
 - A leader is elected at start-up
