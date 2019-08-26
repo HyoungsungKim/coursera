@@ -236,3 +236,161 @@ There is no way to determine whether a message has been lost or just arbitrarily
   - But we do sometimes notice oddities when we look hard
     - Slightly different bidding histories shown to different people shouldn't hurt much if this makes eBay 10x Faster
     - Upload a Youtube video, then search for it -> You may not see it immediately
+
+## 2.2.5 Zookeeper and Paxos: Introduction
+
+### Motivation
+
+- Centralized service : Coordination kernel
+- Maintains
+  - Configuration information
+  - Naming
+  - Distributed synchronization
+  - Group services
+- Avoids synchronization and races
+- File-system-based API
+  - Manipulates small data nodes: znodes
+  - State is a hierarchy of znodes
+
+### Visualizing Paxos
+
+- The ***proposer*** requests that the Paxos system accept some command. Paxos is like a "postal system"
+- It thinks about the letter for a while (replicating the data and picking a delivery order)
+- Once these are "decided," the learners can execute the command
+
+### Overview of Roles of Processes
+
+- The ***client*** issues a request to the distributed system, and waits for a response (e.g. a write request on a file in a distributed file server).
+- The ***Acceptors*** act as the fault-tolerant "memory" of the protocol. Acceptors are collected into groups called Quorums
+  - Any message sent to an Acceptor must be sent to a ***Quorum*** of Acceptors
+  - Any message sent to an Acceptor is duplicated to that quorum, and any message received from an acceptor is ignored unless you get enough of the acceptors sending the same copy the message
+  - Any message received from an Acceptor is ignored unless a copy is received from each Acceptor in a quorum
+
+> 일정 수 이상의 메세지를 acceptors에게 받지 않으면 무시됨
+
+### Paxos Assumptions
+
+Paxos is based on very sort of weak assumption
+
+- Processors operate at arbitrary speed
+- Processors may experience failures
+- Processors with stable storage may rejoin the protocol after failures
+  - Using crash-recovery fault tolerance
+- ***Processors do not collude, lie, or otherwise attempt to subvert the protocol***
+  - i.e. Byzantine failure don't occur. See Byzantine Paxos for a solution that tolerates failures from arbitrary/malicious behavior of the processes
+
+### Paxos Network
+
+- Processors can send messages to any other processor
+- Messages are sent asynchronously and may take arbitrarily long to deliver
+- Messages may be lost, reordered, or duplicated
+- Messages are delivered without corruption
+  - That is, Byzantine network failures don't occur.
+
+### Number of Processors
+
+- In general, a consensus algorithm can make progress using 2F+1 processors despite the simultaneous failure of any F processors
+- However, using reconfiguration, a protocol may be employed, which survives any number of total failures as long as no more than F fail simultaneously
+
+## 2.2.6 Paxos
+
+### Overview of Roles of Processes
+
+- A ***proposer*** advocates a client request, attempting to convince the Acceptors to agree on it, and  Learners act as the replication factor for the protocol
+- Once a Client request has been agreed on by the Acceptors, the Learner may take action(i.e. execute the request and send a response to the client). To improve availability of processing, additional learners can be added
+- Paxos requires a distinguished Proposer (called the ***leader***) to make progress. many processes may believe they are leaders, but the protocol only guarantees progress if one of them is eventually chosen
+- If two processes believe they are leaders, they may stall the protocol by continuously proposing conflicting updates. However, the safety properties are still preserved in that case
+
+### Proposal Number & Agreed Value
+
+- Each attempt to define an agreed value v is performed with proposals, which may or may not be accepted by Acceptors
+- Each proposal is uniquely numbered for a given Proposer
+
+### Basic Paxos
+
+- Each instance of the Basic Paxos protocol decides on  a single output value
+- The protocol proceeds over several rounds
+- A successful round has two phases:
+  1. Prepare - Promise
+  2. Accept request - Accepted
+
+### Prepare Promise
+
+Prepare:
+
+1. A proposer (the leader) creates a proposal identified with a number N
+2. ***This number must be greater than any previous proposal number used by this Proposer***
+3. Then, it sends a prepare message containing this proposal to a Quorum of Acceptors
+
+Promise:
+
+1. ***If the proposal's number N is higher than any previous proposal number received from any Proposer by the Acceptor, then the Acceptor must return a promise to ignore all future proposals having a number less than N.***
+   - If the Acceptor accepted a proposal at some point in the past, it must include the previous proposal number and previous value in its response to the Proposer
+2. Otherwise, the Acceptor can ignore the received proposal. ***It does not have to answer in this case for paxos to work.***
+   - However for the sake of optimization, sending a denial (Nack) response would tell the Proposer that it can stop its attempt to create consensus with proposal N
+
+### Accept Request
+
+1. If a Proposer receives enough promises from a Quorum of Acceptors, it needs to set a value to its proposal
+2. If any Acceptors had previously accepted any proposal, then they will have sent their values to the Proposer, who now must set the value of its proposal to the value associated with the highest proposal number reported by the Acceptors
+3. if none of the Acceptors had accepted a proposal up to this point, then the Proposer may choose any value for its proposal
+4. The Proposer sends an Accept Request message to a Quorum  if Accept with the chosen value for its proposal
+
+### Accepted 
+
+- ***If an Acceptor receives an accept request message for a proposal N, it must accept it*** if and only if it has not already promised to only consider proposals having an identifier greater than N
+- In this case, it should register the corresponding value v and send an Accepted message to the Proposer and every Learner. Else, it can ignore the Accept request
+- ***Rounds fail when multiple Proposers send conflicting prepare messages, or when the Proposer does not receive a Quorum of responses (Promise or Accepted).***
+  - In these cases, another round must be stared with a higher proposal number
+- Notice that when Acceptors accept a request, they also acknowledge the leadership of the Proposer. Hence, paxos can be used to select a leader in a cluster of nodes
+
+### A Paxos for Every Occasion
+
+- Multi Paxos : Avoids Prepare and Promise
+- Cheap paxos : Tolerates F failures with F + 1 processors and F auxiliary
+- Fast paxos : reduces end-to-end messages
+- Generalized paxos : Exploits communitivity
+- Byzantine Paxos
+
+## 2.2.7 Zookeeper
+
+### What is ZoooKeeper
+
+- A highly available, scalable, distributed, configuration, consensus, group membership, leader election, naming and coordination service
+- Difficult to implement these kinds of services reliably
+  - Brittle in the presence of change
+  - Difficult to manage
+  - Different implementations lead to management complexity when the applications are deployed
+
+### ZooKeeper Properties
+
+- File API without partial reads/writes
+  - Simple, wait-free data objects organized hierarchically as in file systems
+- Per-client guarantee of FIFO execution of requests
+- Linearizability for all requests that change the ZooKeeper state
+- Built using ZAB, a totally ordered broadcast protocol(based on Paxos)
+- 2F+1 servers can tolerate f crash failures
+
+### Any Guarantees?
+
+1. Clients will never detect old data
+   - So There is no stale data
+2. Clients will get notified of a change to data they are watching within a bounded period of time
+3. All requests from a client will be processes in order
+4. All results received by a client will be consistent with results received by all other clients
+
+### ZooKeeper Servers
+
+Once the majority of service have stored on their file systems the value, then that is the value that zookeeper's going to return as the consistent value in this distributed algorithm
+
+1. All servers store a copy of the data on disk
+2. A leader is elected at startup
+3. Followers service clients; all updates go through leader
+4. Update response are sent when a majority of servers have persisted the change
+
+### ZooKeeper Servoce
+
+- All servers store a copy of the data, logs, and snapshots on disk and use an in-memory database
+- A leader is elected at start-up
+- Followers service clients; all updates go through leader
+- Update response are sent when a majority of servers recorded the change
