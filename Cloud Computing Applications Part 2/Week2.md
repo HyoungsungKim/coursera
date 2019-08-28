@@ -386,11 +386,121 @@ Once the majority of service have stored on their file systems the value, then t
 1. All servers store a copy of the data on disk
 2. A leader is elected at startup
 3. Followers service clients; all updates go through leader
-4. Update response are sent when a majority of servers have persisted the change
+4. Update response are sent ***when a majority of servers have persisted the change***
 
 ### ZooKeeper Service
 
 - All servers store a copy of the data, logs, and snapshots on disk and use an in-memory database
-- A leader is elected at start-up
+- A leader is elected at startup
 - Followers service clients; all updates go through leader
-- Update response are sent when a majority of servers recorded the change
+- Update response are sent ***when a majority of servers recorded the change***
+
+## 2.5.1 Kafka
+
+Kafka : A way of distributing information from a set of producers to a set of consumers
+
+### Kafka 
+
+- A distributed, partitioned, replicated publish subscribe system providing commit log service
+  - ***Distributed*** means it is actually going to be a cluster of machines that provides the Kafka support
+  - ***Partitioned*** means it is actually using separate partitions to represent the data that it is transferring in the messages from producer to consumer.
+  - ***Replicated*** means these streams are stored in separate systems in the cluster
+
+Producer -> broker(kafka cluster(Indexing, annotations, etc...)) -> consumer
+
+### Description
+
+- Kafka maintains feeds of messages in categories called ***topics***.
+- Processes that publish messages to a Kafka topic are ***producers***.
+- Processes that subscribe to topics and process the feed of published message are ***consumers***.
+- ***Kafka is run as a cluster*** comprised of one or more servers, each of which is called a ***broker.***
+- Communication used TCP, clients include Java
+  - The clients will read these streams in order from the different devices.
+
+kafka : Producer --publish--> broker <--subscribe--consumer
+
+### Characteristics
+
+- Scalability (Kafka is backed by file system)
+  - Hundreds of MB/sec/server throughput
+  - Many TB per server
+  - Now 
+- String guarantees about messages
+  - Strictly ordered (within partitions)
+  - All data persistent
+- Distributed
+  - Replication
+  - Partitioning model
+
+### Topics and Logs
+
+- A Topic has several Partitions
+  - So what you are doing is writing to the end of this file, so there is less reason for corruption
+  - And there is less need for synchronization, all of additional messages from producers go at the end.
+- The consumer is going to double up the front part of it
+  - So you should not get any interference synchronization-wise between the producer and the consumer
+- Partitions of a Topic are distributed across Brokers
+- Kafka stores messages about a topic in a partition as an append only log
+  - Each partition is ordered, numbered, immutable append only sequence of messages -- like a commit log.
+
+### Kafka Server Cluster Implementation
+
+- Each partition is replicated across a configurable number of servers
+- Each partition has one "leader" server and 0 or more followers
+- A leader handles read and write requests.
+- A follower replicates the leader and acts as backup
+- Each server is a leader for some of its partitions and a follower for others to load balance
+- ZooKeeper is used keep the servers consistent
+  - Zookeeper is going to be used as a little sort of data store that records where everything is.
+
+### Producer in Kafka
+
+- Send messages to kafka Brokers
+- Messages are sent to a Topic
+  - Messages with same Key  go to same partition(so they are in order)
+  - Messages without a key go to a random partition(no order guarantee here)
+  - Number of partitions changed?
+    - Sorry... same key might go to another partition...
+
+### Consumer in Kafka
+
+- A consumer can belong to a Consumer Group(CG)
+- Consumers in the same CG
+  - Coordinate with each other to determine which consumer will consume from which partition
+  - Share the Consumer Offsets
+
+### Offset
+
+From Brokers' View
+
+- The index of a message in a log
+- ***Message offset*** does not change
+
+From Consumers' View
+
+- ***Consumer Offset***
+- The position from where i am consuming
+- Consumer Offset can change
+
+### More about Consumer Offsets
+
+- Consumer Offsets are per Topic/Partition/Consumer-Group(for a given group, look up the last consumed position in a topic/partition)
+- Consumer Offsets can be committed as a checkpoint of consumption so it can be used when:
+  - Another consumer in the same CG takes over the partition
+  - Resuming consumption later from committed offsets
+
+### Consumer Rebalance
+
+- Each consumer can have several consumer threads(essentially one queue per thread)
+- Each consumer thread can consume from multiple partitions
+- Each partition will be consumed by exactly one consumer in the entire group
+
+- Consumer rebalance occurs when consumer 4 is down
+- Consumers 1,2, 3 take over consumer 4's partitions and resume from the last committed Consumer Offsets of the CG
+- Transparent to user
+
+### Summary
+
+- What you have is what is effectively a publish subscribe system. But it is actually publishing and subscribing to logs which are stored on dists, making them very reliable and resistant, and also very scalable.
+- Because you can store huge amounts of data, and you can replicate, have more files, have more brokers, more servers.
+- And so you can actually increase the throughput for any particular system.
