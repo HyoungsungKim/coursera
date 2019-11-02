@@ -140,6 +140,133 @@ Data packet : An all-encompassing term that represents any single set of binary 
 
 Allows different networks to communicate with each other through devices known as routers
 
+#### IP Address
+
+IP addresses belong to networks, not to the devices attached to those networks. For example, laptop always has a same mac address but IP is not.
+
+- IP address will be assigned to it automatically through a technology known as Dynamic Host Configuration Protocol. An Ip address assigned this way is known as a ***dynamic IP address***.
+- The opposite of this is known as a ***static IP address,*** which must be a configured on a node, manually.
+- In most cases, static IP addresses are reserved for servers and network devices
+- Dynamic IP addresses are reserved for clients
+
+IP address can be split into two sections:
+
+- The network ID
+- The host ID
+
+#### How MAC address and IP address relate to each other?
+
+- MAC addresses use data link layer
+- IP addresses use network layer.
+
+ How these two separate addresses types relate to each other? This is where ***Address Resolution Protocol(ARP)***
+
+Once IP datagram has been fully formed, it needs to be encapsulated inside an Ethernet frame. This means, that the ***transmitting device needs a destination MAC address to complete the Ethernet frame header.*** Almost all network connected devices while retaining local ARP table.
+
+Address class system : A way of defining how the global IP address space is split up
+
+ARP(Address Resolution Protocol) : ***A protocol used to discover the hardware address of a node with a certain IP address***
+
+ARP table : A list of IP addresses and the MAC addresses associated with them
+
+Scenario : Send some data to the IP address 10.20.30.40 and this destination is not in ARP table.
+
+- When this happens, the node that wants to send data sends a broadcast ARP message to the MAC broadcast address which is all Fs(FF:FF:FF:FF:FF:FF)
+- These kinds of broadcast ARP messages are delivered to all computers on the local network.
+- When the network interface that is been assigned an IP of 10.20.30.40 receives this ARP broadcast, it sends back what is known as an ARP response.
+  - This response message will contain the MAC address for the network interface in question.
+- Now The transmitting computer knows what MAC address to put in the destination hardware address field and the Ethernet frame is ready for delivery.
+- It will also likely store this IP address in its local ARP table so that it won't have to send an ARP broadcast the next time he needs to communicate with this IP.
+- ARP table entries generally expire after a short amount of time to ensure changes in the network are accounted for
+
+#### IP datagram
+
+A highly structured series of fields that are strictly defined
+
+Two primary sections of an IP datagram
+
+- Header
+  - It takes a lot more than Ethernet header
+  - Version(4 bits)
+    - It indicates what version of internet protocol is being used.
+    - The most common version of IP is version 4, or IPv4
+    - Version 6 or IPv6 is rapidly seeing more widespread adoption
+  - Header Length(4 bits)
+    - It declares how long the entire header is
+    - Almost always 20 bytes in length when dealing with IPv4
+  - Service Type(8 bits)
+    - These 8 bits can be used to specify details about quality of service, or QoS, technologies
+    - The important takeaway about QoS is that there are services that allow routers to make adecisions about which IP datagram may be more important than others.
+  - Total Length Length(16 bit)
+    - Indicates the total length of the IP datagram it is attached to
+  - Identification field(16 bits)
+    - A 16 bit number that is used to group messages together
+    - The maximum size of a single datagram is the largest number you can represent with 16 bits: 65,535
+    - If the total amount of data that needs to be sent is larger than what can fir in a single datagram, the IP later needs to split this data up into many individual packets.
+    - When this happens, the identification field is used so that the receiving end understands that evbery packet with the same value in that field is part of the same transmission.
+  - Flags(3 bits)
+    - Used to indicate if a datagram is allowed to be fragmented or to indicate that the datagram has already been fragmented
+    - Fragmentation : The process of taking a single IP datagram and splitting it up into several smaller datagrams
+    - If a datagram has to cross from a network allowing a larger datagram size to one with a smaller datagram size, the datagram would have to be fragmented into smaller ones.
+  - Fragment Offset(12 bits)
+    - Contains values used by the receiving end to take all the parts of a fragmented packet and put them back together in the correct order.
+  - TTL(8 bits)
+    - An 8 bit field that indicates how many router hops a datagram can traverse before it is thrown away
+    - Every time a datagram reaches a new router, that router decrements the TTL field by one.
+    - Once this value reaches zero, a router knows it doesn't have to forward the datagram any further.
+    - The main purpose of this field is to make sure that when there is a misconfiguration in routing that causes an endless loop, datagrams don't spend all eternity tying to reach their destination
+    - Endless loop : A -> B and B -> A
+  - Protocol field(8 bits)
+    - Another 8 bits field that contains data about what transport layer protocol is being used
+    - The most common transport layer protocols are TCP and UDP
+  - Header Checksum(16 bits)
+    - A checksum of the contents of the entire IP datagram header
+    - It functions very much lie the Etherent checksum field we discussed in the last module.
+    - ***Since the TTL field has to be recomputed at every router that a datagram touches, the checksum field necessarily changes too*** 
+  - Source IP Address(32 bits)
+  - Destination IP Address(32 bits)
+  - IP options field(24 bits)
+    - An optional field and is used to set speical characteristics for datagrams primarily used for testing purposes
+  - Padding(32 - size of IP options fields bits)
+    - A series of zeros used to ensure that header is the correct total size
+- Payload
+
+Message (Application layer) -> TCP or UDP header + message (Transport layer) -> IP header + TCP segment or UDP datagram (Network layer) -> Ethernet header + IP datagram + Ethernet footer (Data-link)
+
+#### Subnetting
+
+The process of taking a large network and splitting it up into many individual and smaller subnetworks, or subnets.
+
+#### Subnet ID
+
+- Network IDs : used to identify networks
+- Host IDs : used to identify individual hosts.
+
+If we want to split things up even further, and we do, we'll need to introduce a third concept, the subnet ID. You might remember IP address is just a 32-bit number.
+
+- In a world without without subnets, a certain number of these bits are used for the network ID, and a certain number of the bits are used for the host ID.
+- ***In a world with subnetting, some bits that would normally comprise the host ID are actually used for the subnet ID.*** with all three of these IDs representable by a single IP address, we now have a single 32 bits number that can be accurately delivered across many different networks.
+
+At the internet level, core routers only care about the network ID and use this to send the datagram along to the appropriate gateway router to that network. That gateway router then has some additional information that it can use to send that datagram along to the destination machine or the next router in the path to get there. Finally, the host ID is used by that last router to deliver the datagram to the intended recipient machine. Subnet IDs are calculated via what's known as a subnet mask. 
+
+Just like an IP address, subnet masks are 32-bit numbers that are normally written now as four octets in decimal. The easiest way to understand how subnet masks work is to compare one to an IP address.
+
+Let's work with the IP address 9.100.100.100 again. You might remember that each part of an IP address is an octet, which means that it consists of eight bits. The number 9 in binary is just 1001. But since each octet needs eight bits, we need to pad it with some zeros in front. As far as an IP address is concerned, having a number 9 as the first octet is actually represented as 0000 1001. Similarly, the numeral 100 as an eight-bit number is 0110 0100. So, the entire binary representation of the IP address 9.100.100.100 is a lot of ones and zeros.
+
+***A subnet mask is a binary number that has two sections.***
+
+- The beginning part, which is the mask itself is a string of ones just zeros come after this, the subnet mask, which is the part of the number with all the ones, tells us what we can ignore when computing a host ID.
+- ***The part with all the zeros tells us what to keep.***
+  - Let's use the common subnet mask of 255.255.255.0. This would translate to 24 ones followed by eight zeros. 
+    - The purpose of the mask or the part that's all ones is to tell a router what part of an IP address is the subnet ID
+    - The numbers in the remaining octets that have a corresponding one in the subnet mask are the subnet ID.
+    - The numbers in the remaining octets that have a corresponding zero are the host ID.
+    - The size of a subnet is entirely defined by its subnet mask.
+  - So for example, with the subnet mask of 255.255.255.0, ***we know that only the last octet is available for host IDs,*** regardless of what size the network and subnet IDs are. A single eight-bit number can represent 256 different numbers, or more specifically, the numbers 0-255. ***This is a good time to point out that, in general, a subnet can usually only contain two less than the total number of host IDs available.***
+  - Again, using a subnet mask of 255.255.255.0, we know that the octet available for host IDs can contain the numbers 0-255, but zero is generally not used and 255 is normally reserved as a broadcast address for the subnet. ***This means that, really, only the numbers 1-254 are available for assignment to a host.*** While this total number less than two approach is almost always true, generally speaking, you'll refer to the number of host available in a subnet as the entire number. So, even if it's understood that two addresses aren't available for assignment, you'd still say that eight bits of host IDs space have 256 addresses available, not 254. This is because those other IPs are still IP addresses, even if they aren't assigned directly to a node on that subnet.
+  - IP : 9.100.100.100.100 Subnet : 255.255.255.224 -> Notation : 9.100.100.100.100/27
+    - 255.255.255.224 : 1111 1111 1111 1111 1111 1111 1110 0000 : The number of ones is 27
+
 ### Transport  layer
 
 - Protocol : TCP/UDP
