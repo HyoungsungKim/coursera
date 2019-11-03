@@ -264,14 +264,153 @@ Let's work with the IP address 9.100.100.100 again. You might remember that each
     - The size of a subnet is entirely defined by its subnet mask.
   - So for example, with the subnet mask of 255.255.255.0, ***we know that only the last octet is available for host IDs,*** regardless of what size the network and subnet IDs are. A single eight-bit number can represent 256 different numbers, or more specifically, the numbers 0-255. ***This is a good time to point out that, in general, a subnet can usually only contain two less than the total number of host IDs available.***
   - Again, using a subnet mask of 255.255.255.0, we know that the octet available for host IDs can contain the numbers 0-255, but zero is generally not used and 255 is normally reserved as a broadcast address for the subnet. ***This means that, really, only the numbers 1-254 are available for assignment to a host.*** While this total number less than two approach is almost always true, generally speaking, you'll refer to the number of host available in a subnet as the entire number. So, even if it's understood that two addresses aren't available for assignment, you'd still say that eight bits of host IDs space have 256 addresses available, not 254. This is because those other IPs are still IP addresses, even if they aren't assigned directly to a node on that subnet.
-  - IP : 9.100.100.100.100 Subnet : 255.255.255.224 -> Notation : 9.100.100.100.100/27
+  - IP : 9.100.100.100.100 Subnet : 255.255.255.224 -> Notation : 9.100.100.100.100/27 : CIDR notation
     - 255.255.255.224 : 1111 1111 1111 1111 1111 1111 1110 0000 : The number of ones is 27
+
+#### Router
+
+A network device that forwards traffic depending on the destination address of that traffic.
+
+Router step
+
+1. Receive data packet
+2. Examines destination IP
+3. Looks up IP destination network in routing table
+4. Forward traffic to destination
 
 ### Transport  layer
 
 - Protocol : TCP/UDP
 - Protocol Data Unit : Segment
 - Addressing : Port #'s'
+  - Port : A 16-bit number that is used to direct traffic to specific services running on a networked computer
+
+Allows traffic to be directed to specific network applications.
+
+Transport layer has the ability to multiplex and demultiplex
+
+- Multiplexing : Nodes on the network have the ability to direct traffic toward many different receiving services.
+- Demultiplexing : Same concept with multiplexing, but just at the receiving end
+- Processes -> Multiplexer -> IP -> Demultiplexer -> Processes
+
+#### TCP
+
+IP datagram has a payload section and this is made up of what is known as a TCP segment.
+
+- TCP segment : Made up of a TCP header and a data section
+
+TCP Header
+
+- Source port(16 bits)
+
+  - A high-number port chosen from a special section of ports known as ephemeral ports
+
+- Destination port(16 bits)
+
+  - The port of the service the traffic is intended for
+
+- Sequence number(32 bits)
+
+  - A 32 bits number that is used to keep track of where in a sequence of TCP segments this one is expected to be
+
+- Acknowledgement number(32 bits)
+
+  - The number of the next expected segment
+
+- Data offset field(Header length 4 bits)
+
+  - A 4 bits number that communicates how long the TCP header for this segment is
+
+- Control flags(6 bits)
+
+  - The way TCP establishes a connection, is through the use of different TCP control flags, used in a very specific order.
+
+  - The first flag is known as URG(urgent)
+    - A value of one here indicates that the segment is considered urgent and that the urgent pointer field has more data about this
+  - The second flag is ACK(acknowledge)
+    - A value of one in this field means that the acknowledgement number field should be examined
+  - The third flag is PSH(push)
+    - The transmitting device wants the receiving device to push currently-buffered data to the application on the receiving end as soon as possible
+    - By keeping some amount of data in a buffer, TCP can delivery more meaningful chunks of data to the program waiting for it.
+    - But in some case, sending a very small amount of information, that you need the listening program to respond to immediately.
+      - ***This is what the push flag does***
+  - The forth flag is RST(Reset)
+    - One of the sides in a TCP connection hasn't been able to properly recover from a series of missing or malformed segments
+  - The fifth flag is SYN(Synchronize)
+    - It is used when first establishing a TCP connection and makes sure the receiving end knows to examine the sequence number field
+  - The sixth flag is FIN(Finish)
+    - When this flag is set to one, it means the transmitting computer doesn't have any more data to send and the connection can be closed
+
+- TCP Window(16 bits)
+
+  - Specifies the range of sequence numbers that might be sent before an acknowledgement is required
+
+- Checksum(16 bits)
+
+  - Operate just like the checksum fields at the IP and Ethernet level
+  - Check data is wrong, corrupted or lost
+
+- Urgent pointer field(16 bits)
+
+  - Used in conjunction with one of the TCP control flags to point out particular segments that might be more important than others
+
+- Option(0 or 16 if any)
+
+  - It is sometimes used for more complicated flow control protocols
+
+- Padding
+
+  - Sequence of zeros to ensure that the data payload section begins at the expected location
+
+#### TCP connection establishment
+
+Handshake : A way for two devices to ensure that they are speaking the same protocol and will be able to understand each other.
+
+- Three way handshake(When start a connection)
+
+1. A sends a TCP segment to computer B with this SYN flag set
+2. B sends a response to A with a TCP segment where both SYN and ACK flags are set
+3. Then computer A responds again with just the ACK flag set
+
+- Four way handshake(when close a connection)
+
+1. B sends FIN flag to A
+2. A sends ACK to B
+3. A sends FIN to B
+4. B sends ACK to A
+
+#### Socket
+
+The instantiation of an end-point in a potential TCP connection
+
+- Instantiation : The actual implementation of something defined elsewhere
+- Listen : A TCP socket is ready and listening for incoming connections
+- SYN_SENT : A synchronization request has been sent, but the connection hasn't been established yet
+- SYN_RECEIVED : A socket previously in a LISTEN state has received a synchronization request and sent a SYN/ACK back
+- ESTABLISHED : The TCP connection is in working order and both sides are free to send each other data
+- FIN_WAIT : A FIN has been sent, but the corresponding ACK from the other end hasn't been received yet
+- CLOSE_WAIT : The connection has been closed at the TCP layer, but that the application that opened the socket hasn't released its hold on the socket yet
+- CLOSED : The connection has been fully terminated and that no further communication is possible
+
+#### TCP : Connection-oriented protocol
+
+Connection-oriented protocol : Establishes a connection, and uses this to ensure that all data has been properly transmitted.
+
+- At the IP or Ethernet level, if a checksum doesn't compute, all of that data is just discarded.
+- It is up to TCP to determine when to resend this data since TCP expects an ACK for every bit of data it sends, it is in the best position to know what data successfully got delivered and it can make the decision to resend a segment if needed.
+
+#### Firewall
+
+Block specific ports
+
+### Session Layer
+
+- Facilitating the communication between actual applications and the transport layer
+- Takes application layer data and hands it off th the presentation layer
+
+### Presentation Layer
+
+- Responsible for making sure that the unencapsulated application layer data is able to be understood by the application in question
 
 ### Application layer
 
@@ -279,3 +418,6 @@ Let's work with the IP address 9.100.100.100 again. You might remember that each
 - Protocol Data Unit : Messages
 - Addressing : n/a
 
+Allows these applications to communicate in a way they understand.
+
+This payload section is actually the entire contents of whatever data applications want to send to each other. 
