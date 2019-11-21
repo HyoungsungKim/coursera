@@ -1,6 +1,6 @@
-# Rinforcement Learning 
+# Reinforcement Learning 
 
-Week1
+Week 1
 
 ***Reinforcement learning is different from supervised learning,*** the kind of learning studied in most current research in the field of machine learning.
 
@@ -114,5 +114,107 @@ These methods apply multiple static policies each interacting over an extended p
   - In some cases this information can be misleading (e.g., when states are misperceived), but more often it should enable more efficient search.
     - Although evolution and learning share many features and naturally work together, ***we do not consider evolutionary methods by themselves to be especially well suited to reinforcement learning problems and, accordingly, we do not cover them in this book.***
 
+# Chapter 2 Multi-Armed Bandit
 
+***The most important feature distinguishing reinforcement learning from other types of learning is that it uses training information that evaluates the actions taken rather than instructs by giving correct actions.***
+
+강화학습이 다른 학습 방법과 비교 했을 때 구별되는 특징은, 강화학습에서 사용되는 트레이닝 정보는 옳은 행동이라고 지도 받은 정보를 사용하는 것이 아니라 행동을 평가한 정보를 사용 함
+
+- This is what creates the need for active exploration, for an explicit search for good behavior.
+  - Purely evaluative feedback indicates how good the action taken was, but not whether it was the best or the worst action possible.
+    - Evaluative feedback은 행동이 얼마나 좋은지 나타내지만 그것이 최고인지 최악인지는 보이지 않는다
+  - Purely instructive feedback, on the other hand, indicates the correct action to take, independently of the action actually taken. This kind of feedback is the basis of supervised learning, which includes large parts of pattern classification, artificial neural networks, and system identification. 
+    - Instructive feedback은 옳은 행동을 가르키고, 실제로 행한 행동에는 독립적이다.
+
+In their pure forms, these two kinds of feedback are quite distinct: evaluative feedback depends entirely on the action taken, whereas instructive feedback is independent of the action taken.
+
+##  2.1 A k-armed Bandit Problem
+
+Consider the following learning problem. You are faced repeatedly with a choice among k different options, or actions. After each choice you receive a numerical reward chosen from a stationary probability distribution that depends on the action you selected. Your objective is to maximize the expected total reward over some time period, for example, over 1000 action selections, or time steps.
+
+- This is the original form of the k-armed bandit problem
+- 어떻게 이익을 최대화 할 것인가?
+
+In our k -armed bandit problem, each of the k actions has an expected or mean reward given that that action is selected; let us call this the value of that action. We denote the action selected on time step $$t$$ as $$A_t$$ , and the corresponding reward as $$R_t$$ . The value then of an arbitrary action $$a$$, denoted $$q_*(a)$$, is the expected reward given that a is selected:
+$$
+q_*(a) \doteq \mathbb{E} [R_t | A_t = a]
+$$
+
+- $$A_t = a$$가 주어졌을 때 $$R_t$$의 기댓값을 $$q_*(a)$$ 라 정의 한다
+  - Time step t에서 a를 action 했을 때 평균 reward
+- $$A_t$$ : time step t에서 선택된 action
+- $$R_t$$ : time step t에서 한 action으로 얻을 수 있는 Reward
+
+If you knew the value of each action, then it would be trivial to solve the k -armed bandit problem: you would always select the action with highest value.
+
+- 만약 각 action의 값을 알고 있따면 k-armed bandit problem을 해결하는건 매우 쉬움
+
+***We assume that you do not know the action values with certainty,*** although you may have estimates. We denote the estimated value of action a at time step t as $$Q_t(a)$$. We would like $$Q_t (a)$$ to be close to $$q_*(a)$$.
+
+- Time step t에서 action a를 했을 때 측정 값을 $$Q_t(a)$$ 라고 정의 함
+- $$Q_t(a)$$를 $$q_t(a)$$에 가깝도록 하는 것이 목표
+  - 왜 최댓값이 아니라 평균값에 가깝게 하는게 목표지...?
+
+***If you maintain estimates of the action values, then at any time step there is at least one action whose estimated value is greatest.***
+
+만약 측정을 계속한다면 적어도 하나의 최댓값을 찾을 수 있고, 이 값을 찾을 수 있는 action을 greedy action이라고 함
+
+- We call these ***the `greedy actions`***.
+  - ***When you select one of these actions, we say that you are exploiting*** your current knowledge of the values of the actions.
+    - 만약 greedy action을 선택했다면 이것은 exploiting(이용) 중이라고 말 할 수 있음
+  - ***If instead you select one of the `nongreedy actions`, then we say you are exploring,*** because this enables you to improve your estimate of the nongreedy action’s value.
+    - 만약 nongreedy action을 선택했다면 한다면 exploring(탐험)이라고 할 수 있음
+- Exploitation is the right thing to do to maximize the expected reward on the one step, but exploration may produce the greater total reward in the long run. 
+  - If you have many time steps ahead on which to make action selections, then it may be better to explore the nongreedy actions and discover which of them are better than the greedy action.
+  - Reward is lower in the short run, during exploration, but higher in the long run because after you have discovered the better actions, you can exploit them many times. ***Because it is not possible both to explore and to exploit with any single action selection, one often refers to the “conflict” between exploration and exploitation.***
+  - Exploiting은 현재 step에서 최대의 reward를 얻을 수 있지만, 장기적으로 봤을때 최대의 reward를 보장하지 않음
+  - Conflict of exploitation and exploration
+
+In this book we do not worry about balancing exploration and exploitation in a sophisticated way; we worry only about balancing them at all.
+
+## 2.2 Action-value Methods
+
+We begin by looking more closely at methods for estimating the values of actions and for using the estimates to make action selection decisions, which we collectively call ***action-value methods.***
+
+- Recall that the true value of an action is the mean reward when that action is selected.
+- One natural way to estimate this is by ***averaging***(Not expectation) the rewards actually received:
+
+$$
+Q_t(a) \doteq \dfrac{sum\text{ }of\text{ }rewards\text{ }when\text{ }a\text{ }taken\text{ }prior \text{ }to\text{ }t}{number\text{ }of\text{ }times\text{ }a\text{ }taken\text{ }prior\text{ }t}
+= 
+\dfrac{\sum^{t-1}_{i = 1} R_i \cdot \bold{1}_{A_i=a}}{\sum^{t-1}_{i=1}\bold{1}_{A_i = a}}
+$$
+
+- t 이전에 취한 a(action)의 rewards의 합 / t 이전에 취한 a(action)의 숫자
+- $$\bold{1}_{predicate}$$ denotes the random variable that is $$\bold{1}$$ if `predicate` is true and $$\bold{0}$$ if it is false.
+  - If the denominator is zero, then we instead define $$Q_t(a)$$ as some default value, such as
+    0
+  - 만약 분모가 0이라면 $$Q_t(a)$$ 를 0으로 정의
+- As the denominator goes to infinity, by the law of large numbers, $$Q_t(a)$$ converges to $$q_*(a)$$
+  - 만약 문보가 무한대로(실험 횟수가 무한대로 가면) 가면 큰 수의 법칙에 의해 $$Q_t(a)$$는 $$q_*(a)$$로 수렴
+  - 큰 수의 법칙 : 실험 반복 횟수가 많아지면 결과의 평균은 기댓값에 수렴 함
+- We call this the ***sample-average*** method for estimating action values because each estimate is an average of the sample of relevant rewards.
+  - This is just one way to estimate action values
+
+***The simplest action selection rule is to select one of the actions with the highest estimated value.***
+
+- That is, one of the greedy actions as defined in the previous section. If there is more than one greedy action, then a selection is made among them in some arbitrary way, perhaps randomly. We write this greedy action selection method as
+
+$$
+A_t \doteq \underset{a}{argmax}Q_t(a)
+$$
+
+- $$Q_t(a)$$가 max가 되는 argument a
+
+Greedy action selection always exploits current knowledge to maximize immediate reward;
+
+- It spends no time at all sampling apparently inferior actions to see if they might really be better.
+  - Simple alternative is to behave greedily most of the time, but every once in a while, say with small probability $$\epsilon$$, instead select randomly from among all the actions with equal probability, independently of the action-value estimates.
+    - Greedy하게 행동하다가 가끔 매우 낮은 확률로 무작위로 선택 함
+  - ***We call methods using this near-greedy action selection rule $$\epsilon$$-greedy methods.*** An advantage of these methods is that, in the limit as the number of steps increases, every action will be sampled an infinite number of times, thus ensuring that all the $$Q_t(a)$$ converge to $$q_*(a)$$. 
+    - 시험 횟수가 많아질수록(무한대로 갈 수록) 시험 평균이 전체 평균에 수렴 함
+  - This of course implies that the probability of selecting the optimal action converges to greater than 1- $$\epsilon$$,  that is, to near certainty. These are just asymptotic guarantees, however, and say little about the practical effectiveness of the methods.
+    - 만약 $$\epsilon$$ 이 0이면 계속 greedy하게 행동 하기 때문에 optimal action converges to 1
+
+## 2.3 The 10-armed Testbed
 
